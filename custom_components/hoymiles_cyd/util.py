@@ -4,7 +4,7 @@ from typing import Union
 import asyncio
 import logging
 
-from hoymiles_cyd.dtu import DTU
+from hoymiles_wifi.dtu import DTU
 from hoymiles_cyd.hoymiles import generate_inverter_serial_number
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant

@@ -12,7 +12,7 @@ from homeassistant.components.button import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from hoymiles_cyd.dtu import DTU
+from hoymiles_wifi.dtu import DTU
 
 from .const import (
     CONF_DTU_SERIAL_NUMBER,

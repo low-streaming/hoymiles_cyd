@@ -1,5 +1,5 @@
 from homeassistant.core import ServiceCall
-from hoymiles_cyd.dtu import DTU
+from hoymiles_wifi.dtu import DTU
 
 from hoymiles_cyd.hoymiles import BMSWorkingMode
 

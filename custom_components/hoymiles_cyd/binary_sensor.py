@@ -13,7 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from hoymiles_cyd.dtu import NetworkState
+from hoymiles_wifi.dtu import NetworkState
 
 from .const import (
     CONF_DTU_SERIAL_NUMBER,

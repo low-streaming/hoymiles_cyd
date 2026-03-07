@@ -7,7 +7,7 @@ import homeassistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from hoymiles_cyd.dtu import DTU
+from hoymiles_wifi.dtu import DTU
 from .util import is_encrypted_dtu, async_check_and_update_enc_rand
 
 

@@ -11,7 +11,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.service import SupportsResponse
-from hoymiles_cyd.dtu import DTU
+from hoymiles_wifi.dtu import DTU
 
 from .const import (
     CONF_DTU_SERIAL_NUMBER,
