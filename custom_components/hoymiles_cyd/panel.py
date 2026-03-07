@@ -18,7 +18,7 @@ async def async_setup_panel(hass: HomeAssistant):
         component_name="external_main",
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
-        url_path="hoymiles_cyd_panel",
+        frontend_url_path="hoymiles-cyd-panel",
         config={"url": "/lovelace-hoymiles-cyd"}, # Custom dashboard path
         require_admin=False,
     )
