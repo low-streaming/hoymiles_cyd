@@ -32,17 +32,17 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-
-    # Data from coordinator is the parsed protobuf response.
-    # We will create global sensors (Total Power, Daily Energy) and port-specific sensors.
     
     entities = []
 
-    # Global DTU / General sensors
+    # 1. DTU Device Sensors
+    entities.append(OpenKairoSensor(coordinator, "DTU Power", "dtu_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT, is_dtu=True))
+    entities.append(OpenKairoSensor(coordinator, "DTU Daily Energy", "dtu_daily_energy", SensorDeviceClass.ENERGY, UnitOfEnergy.WATT_HOUR, SensorStateClass.TOTAL_INCREASING, is_dtu=True))
+
+    # 2. Inverter Device Sensors
     entities.append(OpenKairoSensor(coordinator, "Total Power", "total_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT))
     entities.append(OpenKairoSensor(coordinator, "Daily Energy", "daily_energy", SensorDeviceClass.ENERGY, UnitOfEnergy.WATT_HOUR, SensorStateClass.TOTAL_INCREASING))
     
-    # Since we know `pv_data` and `sgs_data` arrays exist in actual RealDataNewResDTO:
     if coordinator.data and hasattr(coordinator.data, "pv_data"):
         for i, pv in enumerate(coordinator.data.pv_data):
             port = pv.port_number
@@ -59,18 +59,18 @@ async def async_setup_entry(
             entities.append(OpenKairoSGSSensor(coordinator, i, "AC Temperature", "temperature", SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS, SensorStateClass.MEASUREMENT))
             entities.append(OpenKairoSGSSensor(coordinator, i, "AC Active Power", "active_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT))
 
-
     async_add_entities(entities)
 
 
 class OpenKairoSensorBase(CoordinatorEntity):
     """Base class for an OpenKairo Hoymiles sensor."""
 
-    def __init__(self, coordinator, name, key, dev_class, unit, state_class) -> None:
+    def __init__(self, coordinator, name, key, dev_class, unit, state_class, is_dtu=False) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._name_prefix = name
         self._key = key
+        self._is_dtu = is_dtu
         
         self._attr_device_class = dev_class
         self._attr_native_unit_of_measurement = unit
@@ -79,15 +79,23 @@ class OpenKairoSensorBase(CoordinatorEntity):
     @property
     def device_info(self):
         """Return device info."""
-        # Using the DTU serial as the identifier
         serial = getattr(self.coordinator.data, "device_serial_number", "unknown")
         fw_version = getattr(self.coordinator.data, "firmware_version", "N/A")
+        
+        if self._is_dtu:
+            return {
+                "identifiers": {(DOMAIN, f"{serial}_dtu")},
+                "name": f"OpenKairo Solar DTU {serial}",
+                "manufacturer": "OpenKairo",
+                "model": "Hoymiles WiFi DTU",
+                "sw_version": str(fw_version),
+            }
         
         return {
             "identifiers": {(DOMAIN, serial)},
             "name": f"OpenKairo Solar Inverter {serial}",
             "manufacturer": "OpenKairo",
-            "model": "Solar Inverter Integration",
+            "model": "Hoymiles Microinverter",
             "sw_version": str(fw_version),
         }
 
@@ -96,12 +104,14 @@ class OpenKairoSensor(OpenKairoSensorBase):
     
     @property
     def name(self):
-        return f"OpenKairo {self._name_prefix}"
+        prefix = "DTU" if self._is_dtu else ""
+        return f"OpenKairo {prefix} {self._name_prefix}".replace("  ", " ")
 
     @property
     def unique_id(self):
         serial = getattr(self.coordinator.data, "device_serial_number", "unknown")
-        return f"{serial}_{self._key}"
+        suffix = "_dtu" if self._is_dtu else ""
+        return f"{serial}{suffix}_{self._key}"
 
     @property
     def native_value(self):
@@ -110,6 +120,11 @@ class OpenKairoSensor(OpenKairoSensorBase):
         if not data:
             return None
         
+        if self._key == "dtu_power":
+            return getattr(data, "dtu_power", 0) / 10.0
+        elif self._key == "dtu_daily_energy":
+            return getattr(data, "dtu_daily_energy", 0)
+
         # Calculate custom fields
         if self._key == "total_power":
             total = 0
