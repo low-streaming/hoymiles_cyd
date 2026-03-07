@@ -14,6 +14,7 @@ async def async_setup_panel(hass: HomeAssistant):
     hass.http.register_static_path(
         "/hoymiles_cyd/panel.js",
         hass.config.path("custom_components/hoymiles_cyd/hoymiles-cyd-panel.js"),
+        False
     )
 
     hass.components.frontend.async_register_built_in_panel(
