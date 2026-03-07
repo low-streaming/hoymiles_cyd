@@ -82,6 +82,18 @@ class ZeroExportManager:
         """Set target power."""
         self._target_watt = value
 
+    async def async_setup(self):
+        """Set up the zero export logic."""
+        options = self.entry.options
+        self._enabled = options.get(CONF_ZERO_EXPORT_ENABLED, False)
+        self._grid_sensor = options.get(CONF_GRID_SENSOR)
+        self._target_watt = options.get(CONF_ZERO_EXPORT_TARGET, 0)
+        self._min_limit = options.get(CONF_ZERO_EXPORT_MIN_LIMIT, 10)
+        self._max_limit = options.get(CONF_ZERO_EXPORT_MAX_LIMIT, 100)
+        
+        # Estimate max capacity from inverter list if possible
+        self._max_capacity = options.get("max_capacity", 800)
+
         # Load existing JSON config if any
         json_path = self.hass.config.path("hoymiles_cyd_config.json")
         if os.path.exists(json_path):
@@ -89,7 +101,6 @@ class ZeroExportManager:
                 try:
                     config = json.load(f)
                     self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
-                    # You could add more here (battery_sensor, etc.)
                 except Exception as e:
                     _LOGGER.error(f"Error loading JSON config: {e}")
 
