@@ -119,7 +119,7 @@
       },
       "zero_export_limit": {
         "name": "Zero export power limit"
-      }
+      },
       "mac_address": {
         "name": "MAC address"
       },
