@@ -36,8 +36,8 @@ async def async_setup_entry(
     entities = []
 
     # 1. DTU Device Sensors
-    entities.append(OpenKairoSensor(coordinator, "DTU Power", "dtu_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT, is_dtu=True))
-    entities.append(OpenKairoSensor(coordinator, "DTU Daily Energy", "dtu_daily_energy", SensorDeviceClass.ENERGY, UnitOfEnergy.WATT_HOUR, SensorStateClass.TOTAL_INCREASING, is_dtu=True))
+    entities.append(OpenKairoSensor(coordinator, "Power", "dtu_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT, is_dtu=True))
+    entities.append(OpenKairoSensor(coordinator, "Daily Energy", "dtu_daily_energy", SensorDeviceClass.ENERGY, UnitOfEnergy.WATT_HOUR, SensorStateClass.TOTAL_INCREASING, is_dtu=True))
 
     # 2. Inverter Device Sensors
     entities.append(OpenKairoSensor(coordinator, "Total Power", "total_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT))
@@ -85,17 +85,17 @@ class OpenKairoSensorBase(CoordinatorEntity):
         if self._is_dtu:
             return {
                 "identifiers": {(DOMAIN, f"{serial}_dtu")},
-                "name": f"OpenKairo Solar DTU {serial}",
-                "manufacturer": "OpenKairo",
-                "model": "Hoymiles WiFi DTU",
+                "name": f"Solar DTU {serial}",
+                "manufacturer": "Hoymiles",
+                "model": "WiFi DTU",
                 "sw_version": str(fw_version),
             }
         
         return {
             "identifiers": {(DOMAIN, serial)},
-            "name": f"OpenKairo Solar Inverter {serial}",
-            "manufacturer": "OpenKairo",
-            "model": "Hoymiles Microinverter",
+            "name": f"Solar Inverter {serial}",
+            "manufacturer": "Hoymiles",
+            "model": "Microinverter",
             "sw_version": str(fw_version),
         }
 
@@ -104,8 +104,8 @@ class OpenKairoSensor(OpenKairoSensorBase):
     
     @property
     def name(self):
-        prefix = "DTU" if self._is_dtu else ""
-        return f"OpenKairo {prefix} {self._name_prefix}".replace("  ", " ")
+        prefix = "Solar DTU" if self._is_dtu else "Solar Inverter"
+        return f"{prefix} {self._name_prefix}".replace("  ", " ")
 
     @property
     def unique_id(self):
