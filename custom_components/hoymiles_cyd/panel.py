@@ -13,7 +13,8 @@ async def async_setup_panel(hass: HomeAssistant):
     # In a full implementation, this would serve a custom LitElement.
     # For now, we point it to a pre-configured dashboard path.
     
-    hass.components.frontend.async_register_built_in_panel(
+    frontend.async_register_built_in_panel(
+        hass,
         component_name="external_main",
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
