@@ -1,6 +1,7 @@
-"""Zero Export (Nulleinspeisung) controller for Hoymiles CYD."""
 import logging
 import asyncio
+import os
+import json
 from typing import Optional
 
 from homeassistant.core import HomeAssistant, callback
@@ -81,18 +82,16 @@ class ZeroExportManager:
         """Set target power."""
         self._target_watt = value
 
-    async def async_setup(self):
-        """Set up the zero export logic."""
-        options = self.entry.options
-        self._enabled = options.get(CONF_ZERO_EXPORT_ENABLED, False)
-        self._grid_sensor = options.get(CONF_GRID_SENSOR)
-        self._target_watt = options.get(CONF_ZERO_EXPORT_TARGET, 0)
-        self._min_limit = options.get(CONF_ZERO_EXPORT_MIN_LIMIT, 10)
-        self._max_limit = options.get(CONF_ZERO_EXPORT_MAX_LIMIT, 100)
-        
-        # Estimate max capacity from inverter list if possible
-        # For now, let's assume we might need a CONF_MAX_CAPACITY
-        self._max_capacity = options.get("max_capacity", 800)
+        # Load existing JSON config if any
+        json_path = self.hass.config.path("hoymiles_cyd_config.json")
+        if os.path.exists(json_path):
+            with open(json_path, "r", encoding="utf-8") as f:
+                try:
+                    config = json.load(f)
+                    self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
+                    # You could add more here (battery_sensor, etc.)
+                except Exception as e:
+                    _LOGGER.error(f"Error loading JSON config: {e}")
 
         if self._enabled and self._grid_sensor:
             _LOGGER.info(f"Setting up Zero Export for {self._grid_sensor} (Target: {self._target_watt}W)")
@@ -105,6 +104,20 @@ class ZeroExportManager:
         if self._unsub:
             self._unsub()
             self._unsub = None
+
+    def update_config(self, config: dict):
+        """Update configuration from external source (Panel)."""
+        _LOGGER.info(f"Updating Zero Export configuration from Panel: {config}")
+        new_sensor = config.get("grid_sensor")
+        
+        if new_sensor and new_sensor != self._grid_sensor:
+            self.stop()
+            self._grid_sensor = new_sensor
+            if self._enabled:
+                _LOGGER.info(f"Re-starting Zero Export with new sensor: {new_sensor}")
+                self._unsub = async_track_state_change_event(
+                    self.hass, [self._grid_sensor], self._handle_grid_change
+                )
 
     @callback
     async def _handle_grid_change(self, event):
