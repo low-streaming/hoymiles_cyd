@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Hoymiles Verbindung",
+        "title": "Hoymiles CYD Nulleinspeisung",
         "description": "Wenn Sie Hilfe bei der Konfiguration benötigen, schauen Sie hier vorbei: https://github.com/low-streaming/hoymiles_cyd",
         "data": {
           "host": "Host",
@@ -11,7 +11,7 @@
         }
       },
       "reconfigure": {
-        "title": "Hoymiles Verbindung",
+        "title": "Hoymiles CYD Nulleinspeisung",
         "description": "Wenn Sie Hilfe bei der Konfiguration benötigen, schauen Sie hier vorbei: https://github.com/low-streaming/hoymiles_cyd",
         "data": {
           "host": "Host",
@@ -51,6 +51,9 @@
     "number": {
       "limit_power_mypower": {
         "name": "Leistungsbegrenzung"
+      },
+      "zero_export_target": {
+        "name": "Nulleinspeisung Ziel-Netzleistung"
       }
     },
     "sensor": {
@@ -99,6 +102,18 @@
       "port_error_code": {
         "name": "Port {port_number} Fehlercode"
       },
+      "zero_export_status": {
+        "name": "Nulleinspeisung Status",
+        "state": {
+          "running": "Läuft",
+          "disabled": "Deaktiviert",
+          "error": "Fehler",
+          "misconfigured": "Falsch konfiguriert"
+        }
+      },
+      "zero_export_limit": {
+        "name": "Nulleinspeisung Leistungslimit"
+      }
       "wifi_ssid": {
         "name": "WLAN-SSID"
       },
@@ -436,6 +451,11 @@
     },
     "hybrid_inverter": {
       "name": "Hybrid-Wechselrichter"
+    }
+  },
+  "switch": {
+    "zero_export_enabled": {
+      "name": "Nulleinspeisung aktivieren"
     }
   },
   "services": {

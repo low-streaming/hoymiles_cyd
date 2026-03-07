@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Hoymiles DTU connection",
+        "title": "Hoymiles CYD Nulleinspeisung",
         "description": "If you need help with the configuration have a look here: https://github.com/low-streaming/hoymiles_cyd",
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
@@ -11,7 +11,7 @@
         }
       },
       "reconfigure": {
-        "title": "Hoymiles DTU connection",
+        "title": "Hoymiles CYD Nulleinspeisung",
         "description": "If you need help with the configuration have a look here: https://github.com/low-streaming/hoymiles_cyd",
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
@@ -51,6 +51,9 @@
     "number": {
       "limit_power_mypower": {
         "name": "Power limit"
+      },
+      "zero_export_target": {
+        "name": "Zero export target power"
       }
     },
     "sensor": {
@@ -105,6 +108,18 @@
       "meter_kind": {
         "name": "Meter kind"
       },
+      "zero_export_status": {
+        "name": "Zero export status",
+        "state": {
+          "running": "Running",
+          "disabled": "Disabled",
+          "error": "Error",
+          "misconfigured": "Misconfigured"
+        }
+      },
+      "zero_export_limit": {
+        "name": "Zero export power limit"
+      }
       "mac_address": {
         "name": "MAC address"
       },
@@ -436,6 +451,11 @@
     },
     "hybrid_inverter": {
       "name": "Hybrid inverter"
+    }
+  },
+  "switch": {
+    "zero_export_enabled": {
+      "name": "Enable zero export"
     }
   },
   "services": {

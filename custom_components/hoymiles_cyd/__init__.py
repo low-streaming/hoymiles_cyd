@@ -50,7 +50,7 @@ from .panel import async_setup_panel
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.BINARY_SENSOR, Platform.BUTTON]
+PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SWITCH]
 
 SET_BMS_SCHEMA = vol.Schema(
     {

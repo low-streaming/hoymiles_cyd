@@ -1,7 +1,7 @@
 """Constants for the Hoymiles integration."""
 
 DOMAIN = "hoymiles_cyd"
-NAME = "Hoymiles"
+NAME = "Hoymiles CYD Nulleinspeisung"
 DOMAIN = "hoymiles_cyd"
 DOMAIN_DATA = f"{DOMAIN}_data"
 CONFIG_VERSION = 5

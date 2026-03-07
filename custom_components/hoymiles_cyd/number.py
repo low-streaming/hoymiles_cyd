@@ -21,6 +21,8 @@ from .const import (
     CONF_THREE_PHASE_INVERTERS,
     DOMAIN,
     HASS_CONFIG_COORDINATOR,
+    HASS_ZERO_EXPORT_MANAGER,
+    CONF_ZERO_EXPORT_TARGET,
 )
 from .entity import HoymilesCoordinatorEntity, HoymilesEntityDescription
 
@@ -90,6 +92,10 @@ async def async_setup_entry(
                     )
                 )
         async_add_entities(sensors)
+    
+    zero_export_manager = hass_data.get(HASS_ZERO_EXPORT_MANAGER)
+    if zero_export_manager:
+        async_add_entities([HoymilesZeroExportTargetNumber(zero_export_manager, config_entry)])
 
 
 class HoymilesNumberEntity(HoymilesCoordinatorEntity, NumberEntity):
@@ -161,3 +167,40 @@ class HoymilesNumberEntity(HoymilesCoordinatorEntity, NumberEntity):
 
         if self._native_value is not None and self._conversion_factor is not None:
             self._native_value *= self._conversion_factor
+
+class HoymilesZeroExportTargetNumber(NumberEntity):
+    """Target Grid Power for Zero Export."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "zero_export_target"
+    _attr_native_min_value = -1000
+    _attr_native_max_value = 1000
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = "W"
+    _attr_mode = NumberMode.BOX
+
+    def __init__(self, manager, entry):
+        """Initialize."""
+        self._manager = manager
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_zero_export_target"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": "Zero Export Controller",
+            "manufacturer": "Hoymiles CYD",
+            "model": "Logic Module",
+        }
+
+    @property
+    def native_value(self):
+        """Return the target power."""
+        return self._manager.target_power
+
+    async def async_set_native_value(self, value):
+        """Set the target power."""
+        self._manager.target_power = int(value)
+        # Update entry options to persist
+        new_options = dict(self._entry.options)
+        new_options[CONF_ZERO_EXPORT_TARGET] = int(value)
+        self.hass.config_entries.async_update_entry(self._entry, options=new_options)
+        self.async_write_ha_state()

@@ -1826,7 +1826,10 @@ class HoymilesZeroExportSensor(SensorEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_zero_export_status"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
+            "identifiers": {(DOMAIN, entry.unique_id)}, # Link to DTU or use entry.entry_id
+            "name": "Zero Export Controller",
+            "manufacturer": "Hoymiles CYD",
+            "model": "Logic Module",
         }
 
     @property

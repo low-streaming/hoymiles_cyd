@@ -51,6 +51,36 @@ class ZeroExportManager:
         """Return last set limit."""
         return self._last_limit
 
+    @property
+    def is_enabled(self) -> bool:
+        """Return True if enabled."""
+        return self._enabled
+
+    @is_enabled.setter
+    def is_enabled(self, value: bool):
+        """Enable or disable logic."""
+        if value == self._enabled:
+            return
+        self._enabled = value
+        if value:
+            if not self._unsub and self._grid_sensor:
+                _LOGGER.info(f"Enabling Zero Export for {self._grid_sensor}")
+                self._unsub = async_track_state_change_event(
+                    self.hass, [self._grid_sensor], self._handle_grid_change
+                )
+        else:
+            self.stop()
+
+    @property
+    def target_power(self) -> int:
+        """Return target power."""
+        return self._target_watt
+
+    @target_power.setter
+    def target_power(self, value: int):
+        """Set target power."""
+        self._target_watt = value
+
     async def async_setup(self):
         """Set up the zero export logic."""
         options = self.entry.options

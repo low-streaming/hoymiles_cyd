@@ -4,7 +4,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 
-PANEL_TITLE = "Hoymiles CYD Control"
+PANEL_TITLE = "Nulleinspeisung Steuerung"
 PANEL_ICON = "mdi:solar-power-variant"
 
 async def async_setup_panel(hass: HomeAssistant):
