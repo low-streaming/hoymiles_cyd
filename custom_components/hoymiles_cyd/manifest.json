@@ -1,0 +1,12 @@
+{
+    "domain": "hoymiles_cyd",
+    "name": "Hoymiles CYD",
+    "codeowners": [],
+    "config_flow": true,
+    "dependencies": [],
+    "iot_class": "local_polling",
+    "requirements": [
+        "hoymiles-wifi>=0.3.0"
+    ],
+    "version": "1.0.0"
+}
