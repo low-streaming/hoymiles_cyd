@@ -1,0 +1,32 @@
+hoymiles_cyd_premium:
+  # Background
+  lovelace-background: 'center / cover no-repeat fixed url("https://images.unsplash.com/photo-1611348586804-61bf6c080437?q=80&w=2070&auto=format&fit=crop")' # Nice dark tech background
+  
+  # Colors
+  primary-color: "#ff8c00"
+  accent-color: "#ff8c00"
+  dark-primary-color: "#cc7000"
+  light-primary-color: "#ffb347"
+  
+  # Cards
+  card-background-color: "rgba(30, 30, 30, 0.7)"
+  ha-card-background: "rgba(30, 30, 30, 0.7)"
+  ha-card-border-radius: "15px"
+  ha-card-border-width: "1px"
+  ha-card-border-color: "rgba(255, 140, 0, 0.3)"
+  ha-card-box-shadow: "0 8px 32px 0 rgba(0, 0, 0, 0.8)"
+  
+  # Text
+  primary-text-color: "#ffffff"
+  secondary-text-color: "#b0b0b0"
+  text-primary-color: "#ffffff"
+  
+  # Sidebar
+  sidebar-background-color: "#121212"
+  sidebar-icon-color: "#808080"
+  sidebar-selected-icon-color: "#ff8c00"
+  sidebar-selected-text-color: "#ffffff"
+  
+  # Header
+  app-header-background-color: "rgba(18, 18, 18, 0.5)"
+  app-header-text-color: "#ffffff"
