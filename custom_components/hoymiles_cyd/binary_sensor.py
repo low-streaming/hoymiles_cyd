@@ -1,4 +1,4 @@
-"""Contains binary sensor entities for Hoymiles WiFi integration."""
+"""Contains binary sensor entities for Hoymiles CYD integration."""
 
 import dataclasses
 from dataclasses import dataclass
@@ -73,7 +73,7 @@ async def async_setup_entry(
 
 
 class HoymilesInverterSensorEntity(HoymilesCoordinatorEntity, BinarySensorEntity):
-    """Represents a binary sensor entity for Hoymiles WiFi integration."""
+    """Represents a binary sensor entity for Hoymiles CYD integration."""
 
     def __init__(
         self,
