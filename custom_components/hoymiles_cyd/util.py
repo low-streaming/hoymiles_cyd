@@ -9,7 +9,7 @@ from hoymiles_wifi.hoymiles import generate_inverter_serial_number
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from hoymiles_cyd.const import IS_ENCRYPTED_BIT_INDEX
+from hoymiles_wifi.const import IS_ENCRYPTED_BIT_INDEX
 
 from .error import CannotConnect
 

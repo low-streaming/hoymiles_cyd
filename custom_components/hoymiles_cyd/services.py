@@ -3,7 +3,7 @@ from hoymiles_wifi.dtu import DTU
 
 from hoymiles_wifi.hoymiles import BMSWorkingMode
 
-from custom_components.hoymiles_cyd.const import HASS_DTU, DOMAIN
+from .const import HASS_DTU, DOMAIN
 from homeassistant.helpers.device_registry import async_get as async_get_device_registry
 
 
