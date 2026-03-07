@@ -6,7 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_HOST
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.core import callback
@@ -28,6 +28,12 @@ from .const import (
     DOMAIN,
     MIN_UPDATE_INTERVAL_SECONDS,
     MIN_TIMEOUT_SECONDS,
+    CONF_ZERO_EXPORT_ENABLED,
+    CONF_GRID_SENSOR,
+    CONF_ZERO_EXPORT_TARGET,
+    CONF_ZERO_EXPORT_MIN_LIMIT,
+    CONF_ZERO_EXPORT_MAX_LIMIT,
+    CONF_MAX_CAPACITY,
 )
 from .error import CannotConnect
 from .util import async_get_config_entry_data_for_host
@@ -203,7 +209,7 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         )
 
 
-class HoymilesInverterOptionsFlowHandler(ConfigFlow, domain=DOMAIN):
+class HoymilesInverterOptionsFlowHandler(OptionsFlow):
     """Handle options."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
@@ -234,12 +240,16 @@ class HoymilesInverterOptionsFlowHandler(ConfigFlow, domain=DOMAIN):
                         default=self.config_entry.options.get(CONF_ZERO_EXPORT_TARGET, 0),
                     ): int,
                     vol.Optional(
-                        "max_capacity",
-                        default=self.config_entry.options.get("max_capacity", 800),
+                        CONF_MAX_CAPACITY,
+                        default=self.config_entry.options.get(CONF_MAX_CAPACITY, 800),
                     ): int,
                     vol.Optional(
                         CONF_ZERO_EXPORT_MIN_LIMIT,
                         default=self.config_entry.options.get(CONF_ZERO_EXPORT_MIN_LIMIT, 10),
+                    ): int,
+                    vol.Optional(
+                        CONF_ZERO_EXPORT_MAX_LIMIT,
+                        default=self.config_entry.options.get(CONF_ZERO_EXPORT_MAX_LIMIT, 100),
                     ): int,
                 }
             ),

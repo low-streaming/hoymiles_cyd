@@ -23,6 +23,7 @@ CONF_GRID_SENSOR = "grid_sensor"
 CONF_ZERO_EXPORT_TARGET = "zero_export_target"
 CONF_ZERO_EXPORT_MIN_LIMIT = "zero_export_min_limit"
 CONF_ZERO_EXPORT_MAX_LIMIT = "zero_export_max_limit"
+CONF_MAX_CAPACITY = "max_capacity"
 
 DEFAULT_UPDATE_INTERVAL_SECONDS = 35
 MIN_UPDATE_INTERVAL_SECONDS = 1
