@@ -1,12 +1,16 @@
 {
-    "domain": "hoymiles_cyd",
-    "name": "Hoymiles CYD",
-    "codeowners": [],
-    "config_flow": true,
-    "dependencies": [],
-    "iot_class": "local_polling",
-    "requirements": [
-        "hoymiles-wifi>=0.3.0"
-    ],
-    "version": "1.0.0"
+  "codeowners": [
+    "@low-streaming"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/low-streaming/hoymiles_cyd",
+  "issue_tracker": "https://github.com/low-streaming/hoymiles_cyd/issues",
+  "domain": "hoymiles_cyd",
+  "iot_class": "local_polling",
+  "name": "Hoymiles CYD",
+  "requirements": [
+    "hoymiles-wifi>=0.5.5"
+  ],
+  "version": "1.0.0"
 }
