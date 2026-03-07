@@ -28,8 +28,8 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-import hoymiles_cyd.hoymiles
-from hoymiles_cyd.hoymiles import DTUType, get_dtu_model_type
+import hoymiles_wifi.hoymiles
+from hoymiles_wifi.hoymiles import DTUType, get_dtu_model_type
 
 from .const import (
     CONF_DTU_SERIAL_NUMBER,
@@ -1516,7 +1516,7 @@ class HoymilesDataSensorEntity(HoymilesCoordinatorEntity, RestoreSensor):
             and self._version_translation_function is not None
         ):
             new_native_value = getattr(
-                hoymiles_cyd.hoymiles, self._version_translation_function
+                hoymiles_wifi.hoymiles, self._version_translation_function
             )(int(new_native_value))
 
         if (
@@ -1778,7 +1778,7 @@ class HoymilesEnergyStorageSensorEntity(HoymilesCoordinatorEntity, RestoreSensor
             and self._version_translation_function is not None
         ):
             new_native_value = getattr(
-                hoymiles_cyd.hoymiles, self._version_translation_function
+                hoymiles_wifi.hoymiles, self._version_translation_function
             )(int(new_native_value))
 
         if (

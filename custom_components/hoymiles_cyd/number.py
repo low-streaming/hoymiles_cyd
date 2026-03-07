@@ -24,7 +24,7 @@ from .const import (
 )
 from .entity import HoymilesCoordinatorEntity, HoymilesEntityDescription
 
-from hoymiles_cyd.hoymiles import DTUType, get_dtu_model_type
+from hoymiles_wifi.hoymiles import DTUType, get_dtu_model_type
 
 
 class SetAction(Enum):

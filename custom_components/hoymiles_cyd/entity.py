@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from hoymiles_cyd.hoymiles import (
+from hoymiles_wifi.hoymiles import (
     DTUType,
     get_dtu_model_name,
     get_inverter_model_name,

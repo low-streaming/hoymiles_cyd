@@ -1,13 +1,13 @@
 from homeassistant.core import ServiceCall
 from hoymiles_wifi.dtu import DTU
 
-from hoymiles_cyd.hoymiles import BMSWorkingMode
+from hoymiles_wifi.hoymiles import BMSWorkingMode
 
 from custom_components.hoymiles_cyd.const import HASS_DTU, DOMAIN
 from homeassistant.helpers.device_registry import async_get as async_get_device_registry
 
 
-from hoymiles_cyd.utils import parse_time_periods_input, parse_time_settings_input
+from hoymiles_wifi.utils import parse_time_periods_input, parse_time_settings_input
 
 import logging
 
