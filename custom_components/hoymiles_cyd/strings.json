@@ -27,6 +27,21 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zero Export Settings",
+        "description": "Configure the Nulleinspeisung controller.",
+        "data": {
+          "zero_export_enabled": "Enable Zero Export",
+          "grid_sensor": "Grid Power Sensor (Entity ID)",
+          "zero_export_target": "Target Grid Power (W)",
+          "max_capacity": "Total Peak Power of PV (W)",
+          "zero_export_min_limit": "Minimum Power Limit (%)"
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "dtu": {
@@ -52,7 +67,7 @@
         "name": "Grid voltage"
       },
       "ac_current": {
-        "name": "AC current" 
+        "name": "AC current"
       },
       "grid_frequency": {
         "name": "Grid frequency"

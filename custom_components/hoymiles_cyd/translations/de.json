@@ -27,6 +27,21 @@
       "already_configured": "Bereits konfiguriert."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nulleinspeisung Einstellungen",
+        "description": "Konfigurieren Sie den Nulleinspeisungs-Controller.",
+        "data": {
+          "zero_export_enabled": "Nulleinspeisung aktivieren",
+          "grid_sensor": "Netz-Leistungssensor (Entity ID)",
+          "zero_export_target": "Ziel-Netzleistung (W)",
+          "max_capacity": "Gessamt-Nennleistung der PV-Anlage (W)",
+          "zero_export_min_limit": "Minimale Leistungsbegrenzung (%)"
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "dtu": {
@@ -52,7 +67,7 @@
         "name": "Netzspannung"
       },
       "ac_current": {
-        "name": "AC-Strom" 
+        "name": "AC-Strom"
       },
       "grid_frequency": {
         "name": "Netzfrequenz"

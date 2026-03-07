@@ -34,6 +34,7 @@ from .const import (
     HASS_DATA_COORDINATOR,
     HASS_DTU,
     HASS_ENERGY_STORAGE_DATA_COORDINATOR,
+    HASS_ZERO_EXPORT_MANAGER,
 )
 from .coordinator import (
     HoymilesAppInfoUpdateCoordinator,
@@ -44,6 +45,8 @@ from .coordinator import (
 from .error import CannotConnect
 from .services import async_handle_set_bms_mode
 from .util import async_get_config_entry_data_for_host
+from .zero_export import ZeroExportManager
+from .panel import async_setup_panel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -150,6 +153,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
             energy_storage_data_coordinator
         )
 
+    # Initialize Zero Export Manager
+    zero_export_manager = ZeroExportManager(hass, config_entry)
+    await zero_export_manager.async_setup()
+    hass_data[HASS_ZERO_EXPORT_MANAGER] = zero_export_manager
+    
+    # Setup Panel
+    await async_setup_panel(hass)
+
     _LOGGER.debug(f"  hass_data: {hass_data}")  # --- IGNORE ---
     _LOGGER.debug(f"  config_entry_id: {config_entry.entry_id}")
 
@@ -237,5 +248,11 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok:
+        hass_data = hass.data[DOMAIN].get(entry.entry_id)
+        if hass_data and HASS_ZERO_EXPORT_MANAGER in hass_data:
+            hass_data[HASS_ZERO_EXPORT_MANAGER].stop()
+        hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok

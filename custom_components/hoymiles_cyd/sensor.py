@@ -46,6 +46,7 @@ from .const import (
     HASS_CONFIG_COORDINATOR,
     HASS_DATA_COORDINATOR,
     HASS_ENERGY_STORAGE_DATA_COORDINATOR,
+    HASS_ZERO_EXPORT_MANAGER,
 )
 from .entity import (
     HoymilesCoordinatorEntity,
@@ -1268,6 +1269,11 @@ async def async_setup_entry(
 
     async_add_entities(sensors)
 
+    # Add Zero Export sensors
+    zero_export_manager = hass_data.get(HASS_ZERO_EXPORT_MANAGER)
+    if zero_export_manager:
+        async_add_entities([HoymilesZeroExportSensor(zero_export_manager, config_entry)])
+
 
 def get_sensors_for_description(
     config_entry: ConfigEntry,
@@ -1805,3 +1811,33 @@ class HoymilesEnergyStorageSensorEntity(HoymilesCoordinatorEntity, RestoreSensor
             state = await self.async_get_last_sensor_data()
             if state:
                 self.last_known_value = state.native_value
+
+
+class HoymilesZeroExportSensor(SensorEntity):
+    """Zero Export status sensor."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "zero_export_status"
+    _attr_icon = "mdi:solar-power"
+
+    def __init__(self, manager, entry):
+        """Initialize."""
+        self._manager = manager
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_zero_export_status"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+        }
+
+    @property
+    def native_value(self):
+        """Return status."""
+        return self._manager.status
+
+    @property
+    def extra_state_attributes(self):
+        """Return attributes."""
+        return {
+            "last_limit": self._manager.last_limit,
+            "target_watt": self._manager.entry.options.get("zero_export_target", 0),
+        }

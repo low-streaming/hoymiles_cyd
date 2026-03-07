@@ -18,6 +18,11 @@ CONF_METERS = "meters"
 CONF_IS_ENCRYPTED = "is_encrypted"
 CONF_ENC_RAND = "enc_rand"
 CONF_TIMEOUT = "timeout"
+CONF_ZERO_EXPORT_ENABLED = "zero_export_enabled"
+CONF_GRID_SENSOR = "grid_sensor"
+CONF_ZERO_EXPORT_TARGET = "zero_export_target"
+CONF_ZERO_EXPORT_MIN_LIMIT = "zero_export_min_limit"
+CONF_ZERO_EXPORT_MAX_LIMIT = "zero_export_max_limit"
 
 DEFAULT_UPDATE_INTERVAL_SECONDS = 35
 MIN_UPDATE_INTERVAL_SECONDS = 1
@@ -34,6 +39,7 @@ HASS_APP_INFO_COORDINATOR = "app_info_coordinator"
 HASS_ENERGY_STORAGE_DATA_COORDINATOR = "energy_stroage_data_coordinator"
 HASS_DTU = "dtu"
 HASS_DATA_UNSUB_OPTIONS_UPDATE_LISTENER = "unsub_options_update_listener"
+HASS_ZERO_EXPORT_MANAGER = "zero_export_manager"
 
 
 FCTN_GENERATE_DTU_VERSION_STRING = "generate_dtu_version_string"

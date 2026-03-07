@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.core import callback
 
 from .const import (
     CONF_DTU_SERIAL_NUMBER,
@@ -58,6 +59,12 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     """Hoymiles Inverter config flow."""
 
     VERSION = CONFIG_VERSION
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> "HoymilesInverterOptionsFlowHandler":
+        """Get the options flow for this handler."""
+        return HoymilesInverterOptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -193,4 +200,47 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+
+class HoymilesInverterOptionsFlowHandler(ConfigFlow, domain=DOMAIN):
+    """Handle options."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_ZERO_EXPORT_ENABLED,
+                        default=self.config_entry.options.get(CONF_ZERO_EXPORT_ENABLED, False),
+                    ): bool,
+                    vol.Optional(
+                        CONF_GRID_SENSOR,
+                        default=self.config_entry.options.get(CONF_GRID_SENSOR, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_ZERO_EXPORT_TARGET,
+                        default=self.config_entry.options.get(CONF_ZERO_EXPORT_TARGET, 0),
+                    ): int,
+                    vol.Optional(
+                        "max_capacity",
+                        default=self.config_entry.options.get("max_capacity", 800),
+                    ): int,
+                    vol.Optional(
+                        CONF_ZERO_EXPORT_MIN_LIMIT,
+                        default=self.config_entry.options.get(CONF_ZERO_EXPORT_MIN_LIMIT, 10),
+                    ): int,
+                }
+            ),
         )
