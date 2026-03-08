@@ -126,24 +126,29 @@ class HoymilesCYDSyncView(HomeAssistantView):
             
         config = await hass.async_add_executor_job(load_config)
 
-        def get_val(entity_id):
+        def get_val(entity_id, scale_key=None):
             if not entity_id: return 0.0
             state = hass.states.get(entity_id)
             if state and state.state not in ("unavailable", "unknown"):
                 try:
                     val = float(state.state)
+                    # Apply scaling from config if present
+                    if scale_key:
+                        scale = config.get(scale_key)
+                        if scale == "kw_to_w": val *= 1000
+                        elif scale == "w_to_kw": val /= 1000
                     return round(val, 2)
                 except ValueError:
                     return state.state
             return 0.0
 
-        # Gather data
-        solar_p = get_val(config.get("solar_power_sensor"))
-        solar_y = get_val(config.get("solar_energy_yield_sensor"))
-        grid_p = get_val(config.get("grid_sensor"))
-        grid_import = get_val(config.get("grid_energy_import_sensor"))
-        grid_export = get_val(config.get("grid_energy_export_sensor"))
-        bat_p = get_val(config.get("battery_power_sensor"))
+        # Gather data with scaling
+        solar_p = get_val(config.get("solar_power_sensor"), "solar_power_scale")
+        solar_y = get_val(config.get("solar_energy_yield_sensor"), "solar_yield_scale")
+        grid_p = get_val(config.get("grid_sensor"), "grid_power_scale")
+        grid_import = get_val(config.get("grid_energy_import_sensor"), "grid_import_scale")
+        grid_export = get_val(config.get("grid_energy_export_sensor"), "grid_export_scale")
+        bat_p = get_val(config.get("battery_power_sensor"), "battery_power_scale")
         bat_soc = get_val(config.get("battery_soc_sensor"))
 
         # Zero Export Status
@@ -155,9 +160,9 @@ class HoymilesCYDSyncView(HomeAssistantView):
 
         import time
         data = {
-            "solar": {"p": solar_p, "y": solar_y},
-            "grid": {"p": grid_p, "imp": grid_import, "exp": grid_export},
-            "bat": {"p": bat_p, "soc": bat_soc},
+            "solar": {"p": solar_p, "y": solar_y, "u_p": config.get("solar_power_unit", "W"), "u_y": config.get("solar_yield_unit", "kWh")},
+            "grid": {"p": grid_p, "imp": grid_import, "exp": grid_export, "u_p": config.get("grid_power_unit", "W"), "u_e": config.get("grid_energy_unit", "kWh")},
+            "bat": {"p": bat_p, "soc": bat_soc, "u_p": config.get("battery_power_unit", "W")},
             "status": ze_status,
             "ts": int(time.time())
         }

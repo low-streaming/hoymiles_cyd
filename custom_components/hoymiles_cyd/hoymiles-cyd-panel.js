@@ -205,11 +205,11 @@ class HoymilesCYDPanel extends LitElement {
             <div class="logo-icon">⚡</div>
             <div class="logo-text">
               <h1>SYSTEM: S_STEUERUNG</h1>
-              <span class="version-tag">NULLEINSPEISUNG ACTIVE</span>
+              <span class="version-tag">NULLEINSPEISUNG AKTIV</span>
             </div>
           </div>
           <div class="time-area">
-            ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} | ${new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+            ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} | ${new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
           </div>
         </div>
 
@@ -435,26 +435,58 @@ class HoymilesCYDPanel extends LitElement {
            <p class="section-lead">Verknüpfe hier deine Home Assistant Sensoren für das Dashboard.</p>
            
            <div class="picker-grid">
-              <hoymiles-entity-picker .hass="${this.hass}" label="Solar Produktion (Watt)" .value="${this.config.solar_power_sensor}"
-                @value-changed="${(e) => this.config = { ...this.config, solar_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              <div class="p-group">
+                <hoymiles-entity-picker .hass="${this.hass}" label="Solar Produktion" .value="${this.config.solar_power_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, solar_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                <div class="unit-row">
+                   <select @change="${(e) => this.config = { ...this.config, solar_power_scale: e.target.value }}">
+                      <option value="none" ?selected="${this.config.solar_power_scale === 'none'}">Einheit: Watt (W)</option>
+                      <option value="kw_to_w" ?selected="${this.config.solar_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
+                   </select>
+                </div>
+              </div>
 
-              <hoymiles-entity-picker .hass="${this.hass}" label="Solar Heute Ertrag (kWh)" .value="${this.config.solar_energy_yield_sensor}"
-                @value-changed="${(e) => this.config = { ...this.config, solar_energy_yield_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              <div class="p-group">
+                <hoymiles-entity-picker .hass="${this.hass}" label="Solar Heute Ertrag" .value="${this.config.solar_energy_yield_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, solar_energy_yield_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                <div class="unit-row">
+                   <select @change="${(e) => this.config = { ...this.config, solar_yield_scale: e.target.value }}">
+                      <option value="none" ?selected="${this.config.solar_yield_scale === 'none'}">Einheit: kWh</option>
+                      <option value="w_to_kw" ?selected="${this.config.solar_yield_scale === 'w_to_kw'}">Eingang ist Wh -> Zu kWh wandeln</option>
+                   </select>
+                </div>
+              </div>
 
-              <hoymiles-entity-picker .hass="${this.hass}" label="Stromzähler Power (Watt)" .value="${this.config.grid_sensor}"
-                @value-changed="${(e) => this.config = { ...this.config, grid_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              <div class="p-group">
+                <hoymiles-entity-picker .hass="${this.hass}" label="Stromzähler Power" .value="${this.config.grid_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, grid_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                <div class="unit-row">
+                   <select @change="${(e) => this.config = { ...this.config, grid_power_scale: e.target.value }}">
+                      <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">Einheit: Watt (W)</option>
+                      <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
+                   </select>
+                </div>
+              </div>
 
-              <hoymiles-entity-picker .hass="${this.hass}" label="Netz Import Heute (kWh)" .value="${this.config.grid_energy_import_sensor}"
-                @value-changed="${(e) => this.config = { ...this.config, grid_energy_import_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              <div class="p-group">
+                <hoymiles-entity-picker .hass="${this.hass}" label="Netz Import Heute" .value="${this.config.grid_energy_import_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, grid_energy_import_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
 
-              <hoymiles-entity-picker .hass="${this.hass}" label="Netz Export Heute (kWh)" .value="${this.config.grid_energy_export_sensor}"
-                @value-changed="${(e) => this.config = { ...this.config, grid_energy_export_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              <div class="p-group">
+                <hoymiles-entity-picker .hass="${this.hass}" label="Netz Export Heute" .value="${this.config.grid_energy_export_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, grid_energy_export_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
 
-              <hoymiles-entity-picker .hass="${this.hass}" label="Batterie Power (Watt)" .value="${this.config.battery_power_sensor}"
-                @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              <div class="p-group">
+                <hoymiles-entity-picker .hass="${this.hass}" label="Batterie Power" .value="${this.config.battery_power_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
 
-              <hoymiles-entity-picker .hass="${this.hass}" label="Batterie SOC (%)" .value="${this.config.battery_soc_sensor}"
-                @value-changed="${(e) => this.config = { ...this.config, battery_soc_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              <div class="p-group">
+                <hoymiles-entity-picker .hass="${this.hass}" label="Batterie SOC (%)" .value="${this.config.battery_soc_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, battery_soc_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
            </div>
         </div>
 
@@ -501,6 +533,13 @@ class HoymilesCYDPanel extends LitElement {
         --glass-border: rgba(255, 255, 255, 0.08);
         --text-dim: #8e8e93;
         overflow-x: hidden;
+      }
+
+      .p-group { border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; background: rgba(255,255,255,0.02); }
+      .unit-row { margin-top: 10px; display: flex; gap: 10px; }
+      .unit-row select { 
+        background: #000; color: #fff; border: 1px solid var(--accent); 
+        padding: 5px 10px; border-radius: 8px; font-size: 0.8em; outline: none;
       }
 
       * { box-sizing: border-box; }

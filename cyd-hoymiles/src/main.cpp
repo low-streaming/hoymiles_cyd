@@ -126,7 +126,7 @@ void display_update() {
   tft.setTextColor(COLOR_ACCENT);
   tft.setTextSize(2);
   tft.setCursor(10, 10);
-  tft.print("Hoymiles Core");
+  tft.print("Solar Zentrale");
 
   tft.setTextSize(1);
   tft.setCursor(240, 12);
@@ -135,7 +135,7 @@ void display_update() {
     tft.print("OFFLINE");
   } else {
     tft.setTextColor(TFT_GREEN);
-    tft.print("HA SYNC");
+    tft.print("AKTIV");
   }
 
   // Visualizer Center Ring (Power Core Style)
@@ -168,16 +168,16 @@ void display_update() {
 
   // Cards
   draw_card(10, 45, 110, 65, "SOLAR", solar_power, "W", COLOR_SOLAR);
-  draw_card(10, 115, 110, 65, "YIELD", solar_yield, "kWh", COLOR_ACCENT);
+  draw_card(10, 115, 110, 65, "ERTRAG", solar_yield, "kWh", COLOR_ACCENT);
 
-  draw_card(200, 45, 110, 65, "BAT SOC", bat_soc, "%", COLOR_BAT);
-  draw_card(200, 115, 110, 65, "HOUSE", (solar_power + grid_power - bat_power),
+  draw_card(200, 45, 110, 65, "AKKU", bat_soc, "%", COLOR_BAT);
+  draw_card(200, 115, 110, 65, "HAUS", (solar_power + grid_power - bat_power),
             "W", COLOR_ACCENT);
 
   // Footer / Status
   tft.setTextColor(COLOR_DIM);
   tft.setCursor(10, 220);
-  tft.print("ZERO STATUS: ");
+  tft.print("REGELUNG: ");
   tft.setTextColor(COLOR_ACCENT);
   tft.print(status_text);
 }
