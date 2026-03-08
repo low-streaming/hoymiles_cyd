@@ -169,7 +169,7 @@ class HoymilesCYDPanel extends LitElement {
 
   async _loadConfig() {
     try {
-      const resp = await this.hass.callApi('GET', 'hoymiles_cyd/config');
+      const resp = await this.hass.callApi('GET', 'hoymiles_cyd_config');
       this.config = { ...this.config, ...resp };
     } catch (e) { console.log("No config found yet"); }
   }
@@ -189,7 +189,7 @@ class HoymilesCYDPanel extends LitElement {
 
   async _saveConfig() {
     try {
-      await this.hass.callApi('POST', 'hoymiles_cyd/config', this.config);
+      await this.hass.callApi('POST', 'hoymiles_cyd_config', this.config);
       this.dispatchEvent(new CustomEvent('hass-notification', {
         detail: { message: "Einstellungen erfolgreich gespeichert!", duration: 3000 },
         bubbles: true, composed: true

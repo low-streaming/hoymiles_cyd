@@ -35,7 +35,7 @@ async def async_setup_panel(hass: HomeAssistant):
         config={
             "_panel_custom": {
                 "name": "hoymiles-cyd-panel",
-                "module_url": "/api/hoymiles_cyd/panel.js"
+                "module_url": "/api/hoymiles_cyd_panel.js"
             }
         },
         require_admin=False,
@@ -44,7 +44,7 @@ async def async_setup_panel(hass: HomeAssistant):
 
 class HoymilesCYDPanelView(HomeAssistantView):
     """View to serve the Hoymiles CYD panel JS file."""
-    url = "/api/hoymiles_cyd/panel.js"
+    url = "/api/hoymiles_cyd_panel.js"
     name = "api:hoymiles_cyd:panel"
     requires_auth = False
 
@@ -65,7 +65,7 @@ class HoymilesCYDPanelView(HomeAssistantView):
 
 class HoymilesCYDConfigView(HomeAssistantView):
     """View to handle Hoymiles CYD configuration."""
-    url = "/api/hoymiles_cyd/config"
+    url = "/api/hoymiles_cyd_config"
     name = "api:hoymiles_cyd:config"
     requires_auth = False # Should be True in production, but following user's pattern
 
@@ -109,7 +109,7 @@ class HoymilesCYDConfigView(HomeAssistantView):
 
 class HoymilesCYDSyncView(HomeAssistantView):
     """View to provide a unified state object for the CYD hardware display."""
-    url = "/api/hoymiles_cyd/sync"
+    url = "/api/hoymiles_cyd_sync"
     name = "api:hoymiles_cyd:sync"
     requires_auth = False # Set to True if Token is used in display
 
