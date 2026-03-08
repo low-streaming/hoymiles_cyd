@@ -269,7 +269,7 @@ void setup() {
 }
 
 void loop() {
-  if (millis() - last_update > 5000) {
+  if (millis() - last_update > 2000) {
     last_update = millis();
     fetch_ha_data();
   }

@@ -98,6 +98,9 @@ class HoymilesCYDConfigView(HomeAssistantView):
                 
         await hass.async_add_executor_job(save_config)
         
+        # Clear cache
+        hass.data[f"{DOMAIN}_cyd_config_cache"] = data
+        
         # Notify ZeroExportManager if it exists
         from .const import HASS_ZERO_EXPORT_MANAGER
         if DOMAIN in hass.data and HASS_ZERO_EXPORT_MANAGER in hass.data[DOMAIN]:
@@ -116,15 +119,18 @@ class HoymilesCYDSyncView(HomeAssistantView):
     async def get(self, request):
         """Return the current states in one JSON."""
         hass = request.app["hass"]
-        config_path = hass.config.path("hoymiles_cyd_config.json")
+        # Try to get config from cache first
+        config = hass.data.get(f"{DOMAIN}_cyd_config_cache")
         
-        def load_config():
-            if os.path.exists(config_path):
-                with open(config_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            return {}
-            
-        config = await hass.async_add_executor_job(load_config)
+        if config is None:
+            config_path = hass.config.path("hoymiles_cyd_config.json")
+            def load_config():
+                if os.path.exists(config_path):
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                return {}
+            config = await hass.async_add_executor_job(load_config)
+            hass.data[f"{DOMAIN}_cyd_config_cache"] = config
 
         def get_val(entity_id, scale_key=None):
             if not entity_id: return 0.0
