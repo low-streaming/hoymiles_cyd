@@ -153,12 +153,13 @@ class HoymilesCYDSyncView(HomeAssistantView):
             manager = hass.data[DOMAIN][HASS_ZERO_EXPORT_MANAGER]
             ze_status = getattr(manager, "status", "Unbekannt")
 
+        import time
         data = {
             "solar": {"p": solar_p, "y": solar_y},
             "grid": {"p": grid_p, "imp": grid_import, "exp": grid_export},
             "bat": {"p": bat_p, "soc": bat_soc},
             "status": ze_status,
-            "ts": int(asyncio.get_event_loop().time())
+            "ts": int(time.time())
         }
 
         return web.json_response(data)
