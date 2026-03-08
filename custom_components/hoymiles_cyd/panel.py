@@ -12,7 +12,7 @@ from .const import DOMAIN
 PANEL_TITLE = "Nulleinspeisung Steuerung"
 PANEL_ICON = "mdi:solar-power-variant"
 
-from homeassistant.components import frontend
+from homeassistant.components.frontend import async_register_built_in_panel
 
 async def async_setup_panel(hass: HomeAssistant):
     """Register the custom panel."""
@@ -26,7 +26,7 @@ async def async_setup_panel(hass: HomeAssistant):
     hass.http.register_view(HoymilesCYDConfigView())
 
     # Register the custom panel in the sidebar
-    frontend.async_register_panel(
+    async_register_built_in_panel(
         hass,
         frontend_url_path="hoymiles-cyd-control",
         component_name="custom",
