@@ -1,0 +1,6 @@
+# Home Assistant
+__pycache__/
+*.pyc
+
+# CYD Display Firmware (keep local, don't push to GitHub)
+cyd-hoymiles/
