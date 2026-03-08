@@ -96,13 +96,16 @@ class ZeroExportManager:
 
         # Load existing JSON config if any
         json_path = self.hass.config.path("hoymiles_cyd_config.json")
-        if os.path.exists(json_path):
-            with open(json_path, "r", encoding="utf-8") as f:
-                try:
-                    config = json.load(f)
-                    self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
-                except Exception as e:
-                    _LOGGER.error(f"Error loading JSON config: {e}")
+        
+        def load_json():
+            if os.path.exists(json_path):
+                with open(json_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            return None
+
+        config = await self.hass.async_add_executor_job(load_json)
+        if config:
+            self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
 
         if self._enabled and self._grid_sensor:
             _LOGGER.info(f"Setting up Zero Export for {self._grid_sensor} (Target: {self._target_watt}W)")
