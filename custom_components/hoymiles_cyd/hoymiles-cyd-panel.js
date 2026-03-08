@@ -247,38 +247,78 @@ class HoymilesCYDPanel extends LitElement {
     const gauge_deg = (parseFloat(control_limit) / 100) * 180;
 
     return html`
-      <div class="dashboard-layout">
+      <div class="dashboard-layout animate-fade-in">
         <div class="main-card glass">
-          <div class="card-caption">ENERGY OVERVIEW (ZERO EXPORT)</div>
+          <div class="card-caption">ENERGIEÜBERSICHT (ZERO EXPORT)</div>
           
           <div class="visualizer">
             <div class="labels-top">
               <div class="box">
-                <span class="lab">Solar Production</span>
+                <span class="lab">Solar Produktion</span>
                 <span class="val orange">${(solar_p / 1000).toFixed(2)} kW</span>
               </div>
               <div class="box right">
-                <span class="lab">House Consumption</span>
+                <span class="lab">Haus Verbrauch</span>
                 <span class="val">${(house_consumption / 1000).toFixed(2)} kW</span>
               </div>
             </div>
 
             <div class="engine">
-              <svg class="engine-svg" viewBox="0 0 600 400">
-                <path d="M 120 100 Q 300 100 300 200" class="pth p-solar" />
-                <path d="M 480 100 Q 300 100 300 200" class="pth p-house" />
-                <path d="M 120 300 Q 300 300 300 200" class="pth p-grid" />
-                <path d="M 480 300 Q 300 300 300 200" class="pth p-batt" />
+              <svg class="engine-svg" viewBox="0 0 600 420">
+                <defs>
+                  <linearGradient id="graphGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:var(--accent);stop-opacity:0.3" />
+                    <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0" />
+                  </linearGradient>
+                </defs>
+                <!-- Static Paths -->
+                <path d="M 120 100 Q 300 100 300 210" class="pth" />
+                <path d="M 480 100 Q 300 100 300 210" class="pth" />
+                <path d="M 120 320 Q 300 320 300 210" class="pth" />
+                <path d="M 480 320 Q 300 320 300 210" class="pth" />
                 
-                ${solar_p > 10 ? html`<circle r="4" fill="#F7931A"><animateMotion dur="2s" repeatCount="indefinite" path="M 120 100 Q 300 100 300 200" /></circle>` : ''}
-                ${house_consumption > 10 ? html`<circle r="4" fill="#fff"><animateMotion dur="2s" repeatCount="indefinite" path="M 300 200 Q 300 100 480 100" /></circle>` : ''}
-                ${grid_p > 10 ? html`<circle r="4" fill="#888"><animateMotion dur="3s" repeatCount="indefinite" path="M 120 300 Q 300 300 300 200" /></circle>` : ''}
+                <!-- Active Flows -->
+                ${solar_p > 20 ? html`
+                  <path d="M 120 100 Q 300 100 300 210" class="pth-active" />
+                  <circle r="5" fill="url(#solarPart)">
+                    <animateMotion dur="${Math.max(0.5, 3 - solar_p / 1000)}s" repeatCount="indefinite" path="M 120 100 Q 300 100 300 210" />
+                  </circle>
+                  <radialGradient id="solarPart"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="var(--accent)"/></radialGradient>
+                ` : ''}
+                
+                ${house_consumption > 20 ? html`
+                  <path d="M 480 100 Q 300 100 300 210" class="pth-active" style="animation-direction: reverse;" />
+                  <circle r="5" fill="#fff">
+                    <animateMotion dur="${Math.max(0.5, 3 - house_consumption / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 100 480 100" />
+                    <filter><feGaussianBlur stdDeviation="2"/></filter>
+                  </circle>
+                ` : ''}
+
+                ${grid_p > 20 ? html`
+                  <path d="M 120 320 Q 300 320 300 210" class="pth-active" />
+                  <circle r="5" fill="#888">
+                    <animateMotion dur="${Math.max(0.5, 4 - grid_p / 1000)}s" repeatCount="indefinite" path="M 120 320 Q 300 320 300 210" />
+                  </circle>
+                ` : html`${grid_p < -20 ? html`
+                  <path d="M 120 320 Q 300 320 300 210" class="pth-active" style="animation-direction: reverse;" />
+                  <circle r="5" fill="var(--accent)">
+                    <animateMotion dur="${Math.max(0.5, 4 - Math.abs(grid_p) / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 320 120 320" />
+                  </circle>
+                ` : ''}`}
+
+                ${Math.abs(batt_p) > 20 ? html`
+                  <path d="M 480 320 Q 300 320 300 210" class="pth-active" style="${batt_p > 0 ? 'animation-direction: reverse;' : ''}" />
+                  <circle r="5" fill="#2ecc71">
+                    <animateMotion dur="${Math.max(0.5, 4 - Math.abs(batt_p) / 1000)}s" repeatCount="indefinite" 
+                      path="${batt_p > 0 ? 'M 300 210 Q 300 320 480 320' : 'M 480 320 Q 300 320 300 210'}" />
+                  </circle>
+                ` : ''}
               </svg>
 
-              <div class="node n-solar" style="top: 75px; left: 95px;"><ha-icon icon="mdi:solar-panel-large"></ha-icon></div>
-              <div class="node n-house" style="top: 75px; right: 95px;"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
-              <div class="node n-grid" style="bottom: 75px; left: 95px;"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
-              <div class="node n-batt" style="bottom: 75px; right: 95px;">
+              <div class="node n-solar" style="top: 68px; left: 88px;"><ha-icon icon="mdi:solar-panel-large"></ha-icon></div>
+              <div class="node n-house" style="top: 68px; right: 88px;"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
+              <div class="node n-grid" style="bottom: 68px; left: 88px;"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
+              <div class="node n-batt" style="bottom: 68px; right: 88px;">
                 <ha-icon icon="mdi:battery-high"></ha-icon>
                 ${battery_soc ? html`<div class="soc-tag">${battery_soc}%</div>` : ''}
               </div>
@@ -287,10 +327,10 @@ class HoymilesCYDPanel extends LitElement {
                 <div class="g-ring"></div>
                 <div class="g-arc" style="transform: rotate(${gauge_deg}deg)"></div>
                 <div class="g-inner">
-                   <div class="g-cap">GRID BALANCE</div>
-                   <div class="g-main">${Math.abs(grid_p)} W</div>
+                   <div class="g-cap">NETZBILANZ</div>
+                   <div class="g-main">${Math.abs(grid_p)}<span style="font-size: 0.4em; margin-left: 4px;">W</span></div>
                    <div class="g-stat ${grid_p >= 0 ? 'red' : 'green'}">
-                      <ha-icon icon="${grid_p >= 0 ? 'mdi:chevron-down' : 'mdi:chevron-up'}"></ha-icon>
+                      <ha-icon icon="${grid_p >= 0 ? 'mdi:arrow-down-bold' : 'mdi:arrow-up-bold'}"></ha-icon>
                       ${grid_p >= 0 ? 'IMPORT' : 'EXPORT'}
                    </div>
                 </div>
@@ -299,9 +339,12 @@ class HoymilesCYDPanel extends LitElement {
           </div>
 
           <div class="graph-area">
-             <div class="graph-info">LIVE GRID POWER <span class="range">Last hour</span></div>
-             <div class="canvas glass-dark">
-                <svg viewBox="0 0 500 100" preserveAspectRatio="none">
+             <div class="graph-info">
+               <span>ENERGIEMESSUNG (NETZLEISTUNG)</span>
+               <span class="range">LETZTE STUNDE</span>
+             </div>
+             <div class="canvas">
+                <svg viewBox="0 0 500 120" preserveAspectRatio="none">
                   <path d="${this._generateGraphPath(true)}" class="area-f" />
                   <path d="${this._generateGraphPath()}" class="line-f" />
                 </svg>
@@ -311,11 +354,11 @@ class HoymilesCYDPanel extends LitElement {
 
         <div class="sidebar">
           <div class="side-card glass">
-            <div class="s-cap">INVERTER STATUS</div>
+            <div class="s-cap">WECHSELRICHTER STATUS</div>
             <div class="s-flex">
-              <div class="s-icon"><ha-icon icon="mdi:inverter"></ha-icon></div>
+              <div class="s-icon"><ha-icon icon="mdi:server-network"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Status</span> <span class="green">ONLINE ●</span></div>
+                <div class="s-row"><span>Status</span> <span class="green">AKTIV ●</span></div>
                 <div class="s-row"><span>Heute Ertrag</span> <span>${yield_today} kWh</span></div>
                 <div class="s-row"><span>Temperatur</span> <span>${inverter_temp}°C</span></div>
               </div>
@@ -323,23 +366,23 @@ class HoymilesCYDPanel extends LitElement {
           </div>
 
           <div class="side-card glass">
-            <div class="s-cap">ENERGY FLOWS</div>
+            <div class="s-cap">ENERGIE FLÜSSE</div>
             <div class="s-flex">
               <div class="s-icon orange"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Heute Import</span> <span>${import_today} kWh</span></div>
-                <div class="s-row"><span>Heute Export</span> <span>${export_today} kWh</span></div>
+                <div class="s-row"><span>Netz Bezug</span> <span>${import_today} kWh</span></div>
+                <div class="s-row"><span>Netz Einspeisung</span> <span>${export_today} kWh</span></div>
               </div>
             </div>
           </div>
 
           <div class="side-card glass">
-            <div class="s-cap">CONTROLLER</div>
+            <div class="s-cap">STEUERUNG (ZEN)</div>
             <div class="s-flex">
-              <div class="s-icon orange"><ha-icon icon="mdi:tune"></ha-icon></div>
+              <div class="s-icon orange"><ha-icon icon="mdi:target-variant"></ha-icon></div>
               <div class="s-vals">
                 <div class="s-row"><span>Leistungslimit</span> <span>${control_limit}%</span></div>
-                <div class="s-row"><span>Autarkie</span> <span class="orange">-- %</span></div>
+                <div class="s-row"><span>Effizienz</span> <span class="orange">OPTIMAL</span></div>
               </div>
             </div>
           </div>
@@ -348,9 +391,10 @@ class HoymilesCYDPanel extends LitElement {
     `;
   }
 
+
   _generateGraphPath(fill = false) {
     if (!this._historyData || this._historyData.length < 2) return "";
-    const w = 500, h = 100;
+    const w = 500, h = 120;
     const data = this._historyData.map(d => parseFloat(d.s) || 0);
     const maxV = Math.max(...data, 100);
     const minV = Math.min(...data, -100);
@@ -363,7 +407,7 @@ class HoymilesCYDPanel extends LitElement {
 
   renderSettings() {
     return html`
-      <div class="settings-page">
+      <div class="settings-page animate-fade-in">
         <div class="config-section glass">
            <div class="section-title">⚙️ SYSTEM KONFIGURATION</div>
            
@@ -420,7 +464,21 @@ class HoymilesCYDPanel extends LitElement {
   }
 
   renderHelp() {
-    return html`<div class="help-page card glass"><h3>HILFE</h3><p>Konfigurieren Sie alle Sensoren unter 'Einstellungen', um das Dashboard zu füllen.</p></div>`;
+    return html`
+      <div class="help-page glass animate-fade-in">
+        <div class="help-header">
+           <ha-icon icon="mdi:help-circle"></ha-icon>
+           <h3>DASHBOARD HILFE</h3>
+        </div>
+        <p>Willkommen bei der Hoymiles CYD Steuerung. Hier ist eine Kurzanleitung:</p>
+        <ul class="help-list">
+          <li><strong>Dashboard:</strong> Echtzeit-Überwachung deiner Solaranlage und Nulleinspeisung.</li>
+          <li><strong>Einstellungen:</strong> Verknüpfe hier deine Home Assistant Sensoren für die korrekre Darstellung.</li>
+          <li><strong>Nulleinspeisung:</strong> Das System regelt den Wechselrichter automatisch, um den Netzbezug auf dem Zielwert zu halten.</li>
+        </ul>
+        <div class="help-footer">Entwickelt für Hoymiles CYD Integration.</div>
+      </div>
+    `;
   }
 
   _toggleSwitch(entity) { this.hass.callService('switch', 'turn_toggle', { entity_id: entity }); }
@@ -428,75 +486,194 @@ class HoymilesCYDPanel extends LitElement {
 
   static get styles() {
     return css`
-      :host { display: block; background: #08080a; color: #e0e0e0; min-height: 100vh; font-family: 'Outfit', sans-serif; --accent: #F7931A; }
-      .panel-container { max-width: 1440px; margin: 0 auto; padding: 20px; }
-      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-      .logo-area { display: flex; align-items: center; gap: 15px; }
-      .logo-icon { font-size: 2em; background: var(--accent); width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; border-radius: 12px; box-shadow: 0 0 20px rgba(247, 147, 26, 0.4); color: #fff; }
-      .logo-text h1 { margin: 0; font-size: 1.25em; letter-spacing: 1px; color: #fff; }
-      .version-tag { font-size: 0.7em; color: var(--accent); font-weight: bold; }
-      .time-area { font-size: 0.85em; color: #666; font-weight: 500; }
+      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
-      .tabs { display: flex; gap: 10px; margin-bottom: 35px; }
-      .tab { padding: 12px 28px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; cursor: pointer; font-size: 0.8em; font-weight: bold; transition: 0.3s; color: #888; }
-      .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 5px 20px rgba(247, 147, 26, 0.3); }
+      :host { 
+        display: block; 
+        background: radial-gradient(circle at 50% -20%, #1a1a1f 0%, #050505 100%);
+        color: #f0f0f0; 
+        min-height: 100vh; 
+        padding-bottom: 50px;
+        font-family: 'Outfit', sans-serif; 
+        --accent: #F7931A; 
+        --accent-glow: rgba(247, 147, 26, 0.4);
+        --bg-panel: rgba(18, 18, 22, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --text-dim: #8e8e93;
+        overflow-x: hidden;
+      }
 
-      .dashboard-layout { display: grid; grid-template-columns: 1fr 340px; gap: 25px; }
-      .glass { background: rgba(20, 20, 25, 0.82); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+      * { box-sizing: border-box; }
 
-      .main-card { padding: 40px; min-height: 700px; display: flex; flex-direction: column; }
-      .card-caption { font-size: 0.8em; font-weight: bold; color: #888; margin-bottom: 50px; letter-spacing: 1.5px; }
+      .animate-fade-in { animation: fadeIn 0.8s ease-out forwards; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+      .panel-container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+
+      /* --- HEADER --- */
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+      .logo-area { display: flex; align-items: center; gap: 20px; }
+      .logo-icon { 
+        font-size: 1.8em; background: linear-gradient(135deg, var(--accent) 0%, #ff6e00 100%); 
+        width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; 
+        border-radius: 16px; box-shadow: 0 8px 30px var(--accent-glow); color: #fff; 
+        animation: pulse-glow 3s infinite;
+      }
+      @keyframes pulse-glow { 
+        0%, 100% { box-shadow: 0 0 20px var(--accent-glow); transform: scale(1); } 
+        50% { box-shadow: 0 0 40px var(--accent-glow); transform: scale(1.02); } 
+      }
+      .logo-text h1 { margin: 0; font-size: 1.4em; letter-spacing: 2px; font-weight: 800; color: #fff; text-transform: uppercase; }
+      .version-tag { font-size: 0.75em; color: var(--accent); font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+      .version-tag::before { content: ''; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: inline-block; box-shadow: 0 0 10px var(--accent); }
+      .time-area { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: var(--text-dim); background: rgba(255,255,255,0.03); padding: 8px 16px; border-radius: 12px; border: 1px solid var(--glass-border); }
+
+      /* --- TABS --- */
+      .tabs { display: flex; gap: 15px; margin-bottom: 40px; }
+      .tab { 
+        padding: 14px 32px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); 
+        border-radius: 14px; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); 
+        color: var(--text-dim); letter-spacing: 1px;
+      }
+      .tab:hover { background: rgba(255,255,255,0.05); color: #fff; transform: translateY(-2px); }
+      .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 10px 30px var(--accent-glow); }
+
+      /* --- LAYOUT --- */
+      .dashboard-layout { display: grid; grid-template-columns: 1fr 360px; gap: 30px; }
+      .glass { 
+        background: var(--bg-panel); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+        border: 1px solid var(--glass-border); border-radius: 28px; 
+        box-shadow: 0 25px 80px rgba(0,0,0,0.5); overflow: hidden;
+        transition: all 0.4s ease;
+      }
+      .glass:hover { border-color: rgba(255,255,255,0.15); }
+
+      /* --- MAIN DASHBOARD --- */
+      .main-card { padding: 45px; min-height: 750px; display: flex; flex-direction: column; position: relative; }
+      .main-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      }
+      .card-caption { font-size: 0.85em; font-weight: 700; color: var(--text-dim); margin-bottom: 60px; letter-spacing: 2px; text-transform: uppercase; }
 
       .visualizer { flex: 1; position: relative; }
       .labels-top { display: flex; justify-content: space-between; position: relative; z-index: 50; }
-      .labels-top .box { display: flex; flex-direction: column; }
-      .lab { font-size: 0.8em; color: #777; margin-bottom: 5px; }
-      .val { font-size: 2.2em; font-weight: bold; }
-      .orange { color: var(--accent); text-shadow: 0 0 15px rgba(247, 147, 26, 0.5); }
+      .labels-top .box { background: rgba(0,0,0,0.2); padding: 15px 25px; border-radius: 18px; border: 1px solid var(--glass-border); }
+      .lab { font-size: 0.75em; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+      .val { font-size: 2.6em; font-weight: 800; font-family: 'JetBrains Mono', monospace; letter-spacing: -1px; }
+      .orange { color: var(--accent); filter: drop-shadow(0 0 12px var(--accent-glow)); }
 
-      .engine { position: relative; width: 600px; height: 400px; margin: 0 auto; }
-      .engine-svg { position: absolute; width: 100%; height: 100%; }
-      .pth { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 3; }
-      .node { position: absolute; width: 55px; height: 55px; border-radius: 50%; background: #111; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 1.3em; }
-      .n-solar { color: var(--accent); border-color: var(--accent); }
-      .soc-tag { position: absolute; top: -10px; right: -10px; background: var(--accent); color: #000; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 10px; }
+      /* --- POWER CORE ENGINE --- */
+      .engine { position: relative; width: 600px; height: 420px; margin: 0 auto; }
+      .engine-svg { position: absolute; width: 100%; height: 100%; filter: drop-shadow(0 0 8px rgba(0,0,0,0.5)); }
+      .pth { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 5; stroke-linecap: round; }
+      .pth-active { stroke: var(--accent); stroke-width: 6; stroke-dasharray: 10 15; opacity: 0.3; filter: blur(2px); animation: flow-dash 1s linear infinite; }
+      @keyframes flow-dash { from { stroke-dashoffset: 25; } to { stroke-dashoffset: 0; } }
 
-      .gauge-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; width: 250px; height: 250px; }
-      .g-ring { position: absolute; width: 100%; height: 100%; border: 12px solid rgba(255,255,255,0.03); border-radius: 50%; }
-      .g-arc { position: absolute; width: 100%; height: 100%; border: 12px solid transparent; border-top-color: var(--accent); border-radius: 50%; filter: drop-shadow(0 0 10px var(--accent)); transition: 1s ease; }
-      .g-cap { font-size: 0.7em; color: #777; font-weight: bold; margin-bottom: 5px; }
-      .g-main { font-size: 2.8em; font-weight: bold; color: #fff; }
-      .g-stat { font-size: 0.85em; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 5px; }
-
-      .graph-area { margin-top: 40px; }
-      .graph-info { font-size: 0.85em; font-weight: bold; color: #555; margin-bottom: 12px; }
-      .canvas { height: 100px; border-radius: 15px; overflow: hidden; background: #000; position: relative; }
-      .line-f { stroke: var(--accent); stroke-width: 2.5; fill: none; }
-      .area-f { fill: linear-gradient(to bottom, rgba(247, 147, 26, 0.2), transparent); }
-
-      .sidebar { display: flex; flex-direction: column; gap: 20px; }
-      .side-card { padding: 25px; }
-      .s-cap { font-size: 0.75em; font-weight: bold; color: #666; margin-bottom: 20px; }
-      .s-flex { display: flex; align-items: center; gap: 20px; }
-      .s-icon { width: 55px; height: 55px; background: rgba(255,255,255,0.03); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4em; border: 1px solid rgba(255,255,255,0.08); }
-      .s-icon.orange { color: var(--accent); border-color: rgba(247, 147, 26, 0.2); }
-      .s-vals { flex: 1; }
-      .s-row { display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 6px; }
-
-      .settings-page { max-width: 900px; margin: 0 auto; }
-      .config-section { padding: 35px; margin-bottom: 30px; }
-      .section-title { color: var(--accent); font-weight: bold; margin-bottom: 30px; }
-      .cfg-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
-      .cfg-label { font-size: 1.1em; font-weight: 500; }
-      .cfg-desc { font-size: 0.85em; color: #555; }
-      .cfg-num { background: #000; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; width: 100px; text-align: center; }
-      .picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
+      .node { 
+        position: absolute; width: 64px; height: 64px; border-radius: 20px; 
+        background: #0d0d0f; border: 1.5px solid rgba(255,255,255,0.1); 
+        display: flex; align-items: center; justify-content: center; z-index: 10; 
+        font-size: 1.6em; box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      .node:hover { transform: scale(1.15) rotate(5deg); border-color: rgba(255,255,255,0.3); }
+      .n-solar { color: var(--accent); border-color: rgba(247, 147, 26, 0.4); box-shadow: 0 0 25px rgba(247, 147, 26, 0.15); }
+      .n-house { color: #fff; border-color: rgba(255,255,255,0.2); }
+      .n-grid { color: #8e8e93; border-color: rgba(255,255,255,0.1); }
+      .n-batt { color: #2ecc71; border-color: rgba(46, 204, 113, 0.3); }
       
-      .mega-save-btn { width: 100%; padding: 22px; background: var(--accent); border: none; border-radius: 15px; color: #fff; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 1.2em; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-      .mega-save-btn:hover { background: #ffaa33; transform: scale(1.02); }
+      .soc-tag { 
+        position: absolute; top: -14px; right: -14px; background: #2ecc71; color: #000; 
+        font-size: 0.75em; font-weight: 800; padding: 4px 10px; border-radius: 12px; 
+        box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
+      }
+
+      .gauge-center { 
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+        display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        width: 280px; height: 280px; z-index: 5;
+      }
+      .g-ring { position: absolute; width: 100%; height: 100%; border: 16px solid rgba(255,255,255,0.02); border-radius: 50%; }
+      .g-arc { 
+        position: absolute; width: 100%; height: 100%; border: 16px solid transparent; 
+        border-top-color: var(--accent); border-radius: 50%; 
+        filter: drop-shadow(0 0 15px var(--accent)); transition: 1.5s cubic-bezier(0.4, 0, 0.2, 1); 
+      }
+      .g-inner { text-align: center; z-index: 10; background: radial-gradient(circle, rgba(20,20,25,0.95) 0%, transparent 70%); width: 200px; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; }
+      .g-cap { font-size: 0.75em; color: var(--text-dim); font-weight: 700; margin-bottom: 5px; letter-spacing: 1px; }
+      .g-main { font-size: 3.4em; font-weight: 800; color: #fff; font-family: 'JetBrains Mono', monospace; line-height: 1; letter-spacing: -2px; }
+      .g-stat { font-size: 0.9em; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.03); }
+
+      /* --- GRAPH --- */
+      .graph-area { margin-top: 60px; background: rgba(0,0,0,0.15); padding: 25px; border-radius: 24px; border: 1px solid var(--glass-border); }
+      .graph-info { font-size: 0.9em; font-weight: 700; color: var(--text-dim); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+      .graph-info .range { font-size: 0.8em; color: var(--accent); border: 1px solid rgba(247, 147, 26, 0.3); padding: 2px 8px; border-radius: 6px; }
+      .canvas { height: 120px; border-radius: 18px; overflow: hidden; background: #08080a; position: relative; border: 1px solid rgba(255,255,255,0.03); }
+      .line-f { stroke: var(--accent); stroke-width: 3; fill: none; filter: drop-shadow(0 0 8px var(--accent-glow)); }
+      .area-f { fill: url(#graphGradient); pointer-events: none; }
+
+      /* --- SIDEBAR --- */
+      .sidebar { display: flex; flex-direction: column; gap: 25px; }
+      .side-card { padding: 30px; position: relative; }
+      .side-card::after { 
+        content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; 
+        background: var(--accent); opacity: 0; transition: 0.3s;
+      }
+      .side-card:hover::after { opacity: 1; }
+      .side-card:hover { transform: translateX(5px); background: rgba(255,255,255,0.05); }
+
+      .s-cap { font-size: 0.8em; font-weight: 800; color: var(--text-dim); margin-bottom: 25px; letter-spacing: 1.5px; text-transform: uppercase; }
+      .s-flex { display: flex; align-items: flex-start; gap: 24px; }
+      .s-icon { 
+        width: 60px; height: 60px; background: rgba(255,255,255,0.03); border-radius: 18px; 
+        display: flex; align-items: center; justify-content: center; font-size: 1.6em; 
+        border: 1px solid var(--glass-border); color: #fff;
+        box-shadow: inset 0 0 15px rgba(255,255,255,0.02);
+      }
+      .s-icon.orange { color: var(--accent); border-color: rgba(247, 147, 26, 0.15); background: rgba(247, 147, 26, 0.03); }
+      .s-vals { flex: 1; }
+      .s-row { display: flex; justify-content: space-between; font-size: 0.95em; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+      .s-row:last-child { border-bottom: none; }
+      .s-row span:first-child { color: var(--text-dim); font-weight: 500; }
+      .s-row span:last-child { font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+
+      /* --- SETTINGS --- */
+      .settings-page { max-width: 1000px; margin: 0 auto; animation: slideUp 0.6s ease-out; }
+      @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+      
+      .config-section { padding: 45px; margin-bottom: 35px; }
+      .section-title { color: var(--accent); font-weight: 800; margin-bottom: 40px; font-size: 1.25em; letter-spacing: 1px; display: flex; align-items: center; gap: 12px; }
+      .section-lead { color: var(--text-dim); margin-bottom: 35px; font-size: 1.1em; line-height: 1.6; }
+
+      .cfg-row { display: flex; justify-content: space-between; align-items: center; padding: 25px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+      .cfg-label { font-size: 1.15em; font-weight: 700; color: #fff; margin-bottom: 6px; }
+      .cfg-desc { font-size: 0.9em; color: var(--text-dim); }
+      .cfg-num { 
+        background: #000; border: 1.5px solid var(--glass-border); color: #fff; 
+        padding: 14px 20px; border-radius: 12px; width: 120px; text-align: center; 
+        font-family: 'JetBrains Mono', monospace; font-size: 1.1em; outline: none; transition: 0.3s;
+      }
+      .cfg-num:focus { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
+      
+      .picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 35px; }
+      
+      .mega-save-btn { 
+        width: 100%; padding: 24px; background: linear-gradient(135deg, var(--accent) 0%, #ff6e00 100%); 
+        border: none; border-radius: 20px; color: #fff; font-weight: 800; cursor: pointer; 
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); font-size: 1.2em; letter-spacing: 2px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 20px var(--accent-glow); margin-top: 20px;
+      }
+      .mega-save-btn:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 20px 50px rgba(0,0,0,0.7), 0 0 40px var(--accent-glow); }
+      .mega-save-btn:active { transform: translateY(2px); }
 
       .green { color: #2ecc71 !important; }
       .red { color: #e74c3c !important; }
+
+      @media (max-width: 1200px) {
+        .dashboard-layout { grid-template-columns: 1fr; }
+        .sidebar { order: 2; }
+      }
     `;
   }
 }
