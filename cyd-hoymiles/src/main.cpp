@@ -6,12 +6,11 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 
-
 Preferences preferences;
 TFT_eSPI tft = TFT_eSPI();
 
 // Configuration
-char ha_host[64] = "http://homeassistant.local:8123";
+char ha_host[64] = "";
 char ha_token[256] = "";
 bool shouldSaveConfig = false;
 
@@ -37,9 +36,10 @@ void wifi_connect() {
   tft.setTextSize(2);
   tft.println("Starting WiFi...");
 
+  // Open Preferences
   preferences.begin("hoymiles", false);
   String saved_host =
-      preferences.getString("ha_host", "http://homeassistant.local:8123");
+      preferences.getString("ha_host", "http://192.168.2.69:8123");
   String saved_token = preferences.getString("ha_token", "");
   strncpy(ha_host, saved_host.c_str(), sizeof(ha_host));
   strncpy(ha_token, saved_token.c_str(), sizeof(ha_token));
@@ -47,7 +47,7 @@ void wifi_connect() {
   WiFiManager wm;
   wm.setSaveConfigCallback(saveConfigCallback);
 
-  WiFiManagerParameter custom_ha_host("host", "HA Host (http://ip:8123)",
+  WiFiManagerParameter custom_ha_host("host", "HA Host (z.B. 192.168.2.94)",
                                       ha_host, 64);
   WiFiManagerParameter custom_ha_token("token", "HA Long-Lived Token", ha_token,
                                        256);
@@ -63,18 +63,23 @@ void wifi_connect() {
     ESP.restart();
   }
 
+  // Always update our variables from parameters
   strncpy(ha_host, custom_ha_host.getValue(), sizeof(ha_host));
   strncpy(ha_token, custom_ha_token.getValue(), sizeof(ha_token));
 
-  if (shouldSaveConfig) {
+  if (shouldSaveConfig || strlen(ha_host) > 0) {
+    preferences.begin("hoymiles", false);
     preferences.putString("ha_host", ha_host);
     preferences.putString("ha_token", ha_token);
     preferences.end();
+    Serial.println("Config Saved to NVS");
   }
 
   tft.fillScreen(TFT_BLACK);
   tft.setCursor(10, 10);
   tft.println("WiFi Connected!");
+  Serial.print("HA Host: ");
+  Serial.println(ha_host);
   delay(1000);
 }
 
@@ -101,6 +106,7 @@ void draw_card(int x, int y, int w, int h, const char *label, float val,
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(3);
   tft.setCursor(x + 10, y + 25);
+  // Simple check for large values
   if (val < 10 && val > -10)
     tft.print(val, 1);
   else
@@ -129,7 +135,7 @@ void display_update() {
     tft.print("OFFLINE");
   } else {
     tft.setTextColor(TFT_GREEN);
-    tft.print("ONLINE");
+    tft.print("HA SYNC");
   }
 
   // Visualizer Center Ring (Power Core Style)
@@ -145,10 +151,10 @@ void display_update() {
 
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(2);
-  int gw = tft.textWidth(String((int)grid_power) + " W");
+  String gStr = String((int)grid_power) + " W";
+  int gw = tft.textWidth(gStr);
   tft.setCursor(cx - gw / 2, cy - 7);
-  tft.print((int)grid_power);
-  tft.print(" W");
+  tft.print(gStr);
 
   tft.setTextSize(1);
   tft.setTextColor(COLOR_DIM);
@@ -156,17 +162,22 @@ void display_update() {
   tft.setCursor(cx - tft.textWidth(grid_txt) / 2, cy + 12);
   tft.print(grid_txt);
 
+  // Flow Lines (Simple)
+  // Solar to center
+  tft.drawLine(65, 110, cx - cx / 4, cy - cy / 4, COLOR_SOLAR);
+
   // Cards
   draw_card(10, 45, 110, 65, "SOLAR", solar_power, "W", COLOR_SOLAR);
   draw_card(10, 115, 110, 65, "YIELD", solar_yield, "kWh", COLOR_ACCENT);
 
   draw_card(200, 45, 110, 65, "BAT SOC", bat_soc, "%", COLOR_BAT);
-  draw_card(200, 115, 110, 65, "BAT W", bat_power, "W", COLOR_BAT);
+  draw_card(200, 115, 110, 65, "HOUSE", (solar_power + grid_power - bat_power),
+            "W", COLOR_ACCENT);
 
   // Footer / Status
   tft.setTextColor(COLOR_DIM);
   tft.setCursor(10, 220);
-  tft.print("ZERO EXPORT: ");
+  tft.print("ZERO STATUS: ");
   tft.setTextColor(COLOR_ACCENT);
   tft.print(status_text);
 }
@@ -178,29 +189,71 @@ void fetch_ha_data() {
   WiFiClient client;
   HTTPClient http;
 
-  String url = String(ha_host) + "/api/hoymiles_cyd/sync";
+  String url = String(ha_host);
+  if (url.length() < 5)
+    return;
+
+  // Fix URL Scheme
+  if (!url.startsWith("http")) {
+    url = "http://" + url;
+  }
+
+  // Only append :8123 if NO port is specified (checks for second colon after
+  // http://)
+  if (url.indexOf(":", 7) == -1) {
+    url += ":8123";
+  }
+
+  // Ensure we use the NEW flat API path
+  if (!url.endsWith("/api/hoymiles_cyd_sync")) {
+    if (url.endsWith("/"))
+      url.remove(url.length() - 1);
+    url += "/api/hoymiles_cyd_sync";
+  }
+
+  Serial.println("--- Sync Attempt ---");
+  Serial.print("Target URL: ");
+  Serial.println(url);
+  if (strlen(ha_token) > 10) {
+    Serial.println("Auth: Token provided");
+  } else {
+    Serial.println("Auth: No token (trying Public Access)");
+  }
+
   http.begin(client, url);
   if (strlen(ha_token) > 5) {
     http.addHeader("Authorization", "Bearer " + String(ha_token));
   }
 
   int httpCode = http.GET();
+  Serial.print("Result Code: ");
+  Serial.println(httpCode);
+
   if (httpCode == 200) {
     String payload = http.getString();
     JsonDocument doc;
-    deserializeJson(doc, payload);
+    DeserializationError error = deserializeJson(doc, payload);
 
-    solar_power = doc["solar"]["p"];
-    solar_yield = doc["solar"]["y"];
-    grid_power = doc["grid"]["p"];
-    bat_power = doc["bat"]["p"];
-    bat_soc = doc["bat"]["soc"];
-    status_text = doc["status"].as<String>();
-
-    is_offline = false;
+    if (!error) {
+      solar_power = doc["solar"]["p"];
+      solar_yield = doc["solar"]["y"];
+      grid_power = doc["grid"]["p"];
+      bat_power = doc["bat"]["p"];
+      bat_soc = doc["bat"]["soc"];
+      status_text = doc["status"].as<String>();
+      is_offline = false;
+      Serial.println("Sync: SUCCESS");
+    } else {
+      Serial.print("JSON Error: ");
+      Serial.println(error.c_str());
+      is_offline = true;
+    }
   } else {
-    Serial.printf("HTTP Failed: %d\n", httpCode);
     is_offline = true;
+    if (httpCode == 404)
+      Serial.println("Error: API Path not found. Check Home Assistant Logs!");
+    if (httpCode == 401)
+      Serial.println("Error: Unauthorized! Please provide a Token.");
   }
   http.end();
   display_update();
