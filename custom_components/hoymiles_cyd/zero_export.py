@@ -221,33 +221,45 @@ class ZeroExportManager:
             # Avoid small jitter
             if self._last_limit is None or abs(self._last_limit - new_limit) >= 0.5:
                 mode = self._config.get("operation_mode", "zero_export")
-                target_inverter = self._config.get("selected_inverter", "all")
+                inv_type = self._config.get("inverter_type", "hoymiles")
                 
                 if mode == "disabled":
                     return
 
-                if mode == "manual_limit":
-                   # In manual mode, we might want to just set a fixed limit
-                   # For now, let's keep it simple: if it's manual, we don't auto-adjust here
-                   # OR we could have a 'manual_power_limit' field in config
-                   pass
-
-                _LOGGER.info(f"Zero Export: Adjusting limit to {new_limit}% (Target: {target_inverter}, Mode: {mode})")
-                
-                # Check if the dtu object supports targeting an inverter
-                # Usually it's either dtu.async_set_power_limit(limit, [sn]) 
-                # or similar. We'll try to handle both if we knew the API.
-                # Assuming dtu.async_set_power_limit(limit) sets it globally.
-                
-                if target_inverter == "all":
-                    await dtu.async_set_power_limit(new_limit)
-                else:
-                    # Logic to set limit for a specific inverter
-                    # If the library doesn't support it directly, this might fail or need adjustment
-                    try:
-                        await dtu.async_set_power_limit(new_limit, [target_inverter])
-                    except Exception:
+                if inv_type == "hoymiles":
+                    target_inverter = self._config.get("selected_inverter", "all")
+                    _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {new_limit}% (Target: {target_inverter})")
+                    if target_inverter == "all":
                         await dtu.async_set_power_limit(new_limit)
+                    else:
+                        try:
+                            await dtu.async_set_power_limit(new_limit, [target_inverter])
+                        except Exception:
+                            await dtu.async_set_power_limit(new_limit)
+                else:
+                    # Generic Inverter (e.g. EZ1)
+                    limit_entity = self._config.get("external_limit_entity")
+                    if not limit_entity:
+                        _LOGGER.warning("Zero Export: Generic mode enabled but no limit entity configured")
+                        return
+                    
+                    limit_unit = self._config.get("generic_limit_type", "watt")
+                    final_value = desired_production if limit_unit == "watt" else new_limit
+                    
+                    # Apply max capacity limit for absolute watt mode
+                    if limit_unit == "watt":
+                        final_value = min(float(self._max_capacity), final_value)
+                        final_value = round(final_value, 0) # Watts usually don't need decimals in most WRs
+                    
+                    _LOGGER.info(f"Zero Export (Generic): Setting {limit_entity} to {final_value} {limit_unit}")
+                    
+                    domain_part = limit_entity.split('.')[0]
+                    await self.hass.services.async_call(
+                        domain_part,
+                        "set_value",
+                        {"entity_id": limit_entity, "value": final_value},
+                        blocking=True
+                    )
                 
                 self._last_limit = new_limit
                 

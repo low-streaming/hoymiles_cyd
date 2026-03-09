@@ -150,7 +150,10 @@ class HoymilesCYDPanel extends LitElement {
       battery_power_sensor: '',
       target_grid_watt: 10,
       operation_mode: 'zero_export',
-      selected_inverter: 'all'
+      selected_inverter: 'all',
+      external_limit_entity: '',
+      inverter_type: 'hoymiles',
+      generic_limit_type: 'watt'
     };
     this._historyData = [];
     this._configLoaded = false;
@@ -477,15 +480,49 @@ class HoymilesCYDPanel extends LitElement {
 
             <div class="cfg-row">
                <div class="cfg-info">
-                  <div class="cfg-label">Steuerungs-Ziel (WR)</div>
-                  <div class="cfg-desc">Wähle einen spezifischen Wechselrichter oder alle.</div>
+                  <div class="cfg-label">Wechselrichter Typ</div>
+                  <div class="cfg-desc">Hoymiles (DTU) oder Generisch (EZ1/Andere via Entity).</div>
                </div>
-               <select class="cfg-select" .value="${this.config.selected_inverter || 'all'}"
-                 @change="${(e) => this.config = { ...this.config, selected_inverter: e.target.value }}">
-                  <option value="all">Alle Wechselrichter</option>
-                  ${this._availableInverters.map(sn => html`<option value="${sn}">Inverter: ${sn}</option>`)}
+               <select class="cfg-select" .value="${this.config.inverter_type || 'hoymiles'}"
+                 @change="${(e) => this.config = { ...this.config, inverter_type: e.target.value }}">
+                  <option value="hoymiles">Hoymiles (Native DTU)</option>
+                  <option value="generic">Generisch (HA Number Entity)</option>
                </select>
             </div>
+
+            ${this.config.inverter_type === 'hoymiles' ? html`
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Steuerungs-Ziel (WR)</div>
+                    <div class="cfg-desc">Wähle einen spezifischen Wechselrichter oder alle.</div>
+                 </div>
+                 <select class="cfg-select" .value="${this.config.selected_inverter || 'all'}"
+                   @change="${(e) => this.config = { ...this.config, selected_inverter: e.target.value }}">
+                    <option value="all">Alle Wechselrichter</option>
+                    ${this._availableInverters.map(sn => html`<option value="${sn}">Inverter: ${sn}</option>`)}
+                 </select>
+              </div>
+            ` : html`
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Limit-Entität (External)</div>
+                    <div class="cfg-desc">Wähle die Number-Entität deines Wechselrichters (z.B. EZ1 Limit).</div>
+                 </div>
+                 <hoymiles-entity-picker .hass="${this.hass}" label="Limit Sensor/Number" .value="${this.config.external_limit_entity}"
+                   @value-changed="${(e) => this.config = { ...this.config, external_limit_entity: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Limit Einheit</div>
+                    <div class="cfg-desc">Verwendet dein WR Watt (EZ1) oder Prozent (%) für das Limit?</div>
+                 </div>
+                 <select class="cfg-select" .value="${this.config.generic_limit_type || 'watt'}"
+                   @change="${(e) => this.config = { ...this.config, generic_limit_type: e.target.value }}">
+                    <option value="watt">Watt (W)</option>
+                    <option value="percent">Prozent (%)</option>
+                 </select>
+              </div>
+            `}
          </div>
 
         <div class="config-section glass">
