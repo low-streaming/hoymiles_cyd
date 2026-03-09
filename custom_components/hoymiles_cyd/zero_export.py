@@ -237,10 +237,10 @@ class ZeroExportManager:
                         except Exception:
                             await dtu.async_set_power_limit(new_limit)
                 else:
-                    # Generic Inverter (e.g. EZ1)
+                    # Generic / OpenDTU / AhoyDTU
                     limit_entity = self._config.get("external_limit_entity")
                     if not limit_entity:
-                        _LOGGER.warning("Zero Export: Generic mode enabled but no limit entity configured")
+                        _LOGGER.warning(f"Zero Export: External mode {inv_type} enabled but no limit entity configured")
                         return
                     
                     limit_unit = self._config.get("generic_limit_type", "watt")

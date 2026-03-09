@@ -444,172 +444,179 @@ class HoymilesCYDPanel extends LitElement {
   renderSettings() {
     return html`
       <div class="settings-page animate-fade-in">
-        <div class="config-section glass">
-           <div class="section-title">⚙️ SYSTEM KONFIGURATION</div>
-           
-           <div class="cfg-row">
-              <div class="cfg-info">
-                 <div class="cfg-label">Automatisierung Aktivieren</div>
-                 <div class="cfg-desc">Aktiviert oder deaktiviert die Nulleinspeisung.</div>
-              </div>
-              <ha-switch .checked="${this.hass.states['switch.zero_export_controller_nulleinspeisung_aktivieren']?.state === 'on'}"
-                @change="${() => this._toggleSwitch('switch.zero_export_controller_nulleinspeisung_aktivieren')}"></ha-switch>
-           </div>
+        <div class="setup-header">
+           <div class="setup-title">S_SETUP: KONFIGURATION</div>
+           <div class="setup-step">Schritt-für-Schritt Einrichtung für optimale Nulleinspeisung.</div>
+        </div>
 
-           <div class="cfg-row">
-              <div class="cfg-info">
-                 <div class="cfg-label">Ziel-Netzbezug (Watt)</div>
-                 <div class="cfg-desc">Der Wert am Zähler, der stabil gehalten werden soll.</div>
-              </div>
-              <input type="number" class="cfg-num" .value="${this.config.target_grid_watt || 0}"
-                @change="${(e) => this.config = { ...this.config, target_grid_watt: e.target.value }}">
-           </div>
+        <!-- STEUERUNG & SYSTEM -->
+        <div class="config-grid">
+          <div class="config-section glass">
+             <div class="section-title"><ha-icon icon="mdi:tune-vertical"></ha-icon> STEUERUNG</div>
+             
+             <div class="cfg-row">
+                <div class="cfg-info">
+                   <div class="cfg-label">Automatisierung</div>
+                   <div class="cfg-desc">Nulleinspeisung ein- oder ausschalten.</div>
+                </div>
+                <ha-switch .checked="${this.hass.states['switch.zero_export_controller_nulleinspeisung_aktivieren']?.state === 'on'}"
+                  @change="${() => this._toggleSwitch('switch.zero_export_controller_nulleinspeisung_aktivieren')}"></ha-switch>
+             </div>
 
-            <div class="cfg-row">
-               <div class="cfg-info">
-                  <div class="cfg-label">Betriebsmodus</div>
-                  <div class="cfg-desc">Wähle zwischen Automatisierung (ZEN) oder manuellem Test.</div>
-               </div>
-               <select class="cfg-select" .value="${this.config.operation_mode || 'zero_export'}"
-                 @change="${(e) => this.config = { ...this.config, operation_mode: e.target.value }}">
-                  <option value="zero_export">Nulleinspeisung (ZEN)</option>
-                  <option value="manual_limit">Manueller Festwert (%)</option>
-                  <option value="disabled">Inaktiv</option>
-               </select>
-            </div>
+             <div class="cfg-row">
+                <div class="cfg-info">
+                   <div class="cfg-label">Betriebsmodus</div>
+                   <div class="cfg-desc">ZEN = Automatisch, Manuell = Fester Wert.</div>
+                </div>
+                <select class="cfg-select" .value="${this.config.operation_mode || 'zero_export'}"
+                  @change="${(e) => this.config = { ...this.config, operation_mode: e.target.value }}">
+                   <option value="zero_export">ZEN (Automatik)</option>
+                   <option value="manual_limit">Manuell (%)</option>
+                   <option value="disabled">Inaktiv</option>
+                </select>
+             </div>
 
-            <div class="cfg-row">
-               <div class="cfg-info">
-                  <div class="cfg-label">Wechselrichter Typ</div>
-                  <div class="cfg-desc">Hoymiles (DTU) oder Generisch (EZ1/Andere via Entity).</div>
-               </div>
-               <select class="cfg-select" .value="${this.config.inverter_type || 'hoymiles'}"
-                 @change="${(e) => this.config = { ...this.config, inverter_type: e.target.value }}">
-                  <option value="hoymiles">Hoymiles (Native DTU)</option>
-                  <option value="generic">Generisch (HA Number Entity)</option>
-               </select>
-            </div>
+             <div class="cfg-row">
+                <div class="cfg-info">
+                   <div class="cfg-label">Hardware-System</div>
+                   <div class="cfg-desc">Welches Gerät wird gesteuert?</div>
+                </div>
+                <select class="cfg-select" .value="${this.config.inverter_type || 'hoymiles'}"
+                  @change="${(e) => this.config = { ...this.config, inverter_type: e.target.value }}">
+                   <option value="hoymiles">Hoymiles (DTU)</option>
+                   <option value="opendtu">OpenDTU / AhoyDTU</option>
+                   <option value="generic">Anderes (EZ1/HA)</option>
+                </select>
+             </div>
 
-            ${this.config.inverter_type === 'hoymiles' ? html`
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Steuerungs-Ziel (WR)</div>
-                    <div class="cfg-desc">Wähle einen spezifischen Wechselrichter oder alle.</div>
-                 </div>
-                 <select class="cfg-select" .value="${this.config.selected_inverter || 'all'}"
-                   @change="${(e) => this.config = { ...this.config, selected_inverter: e.target.value }}">
-                    <option value="all">Alle Wechselrichter</option>
-                    ${this._availableInverters.map(sn => html`<option value="${sn}">Inverter: ${sn}</option>`)}
-                 </select>
-              </div>
-            ` : html`
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Limit-Entität (External)</div>
-                    <div class="cfg-desc">Wähle die Number-Entität deines Wechselrichters (z.B. EZ1 Limit).</div>
-                 </div>
-                 <hoymiles-entity-picker .hass="${this.hass}" label="Limit Sensor/Number" .value="${this.config.external_limit_entity}"
-                   @value-changed="${(e) => this.config = { ...this.config, external_limit_entity: e.detail.value }}"></hoymiles-entity-picker>
-              </div>
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Limit Einheit</div>
-                    <div class="cfg-desc">Verwendet dein WR Watt (EZ1) oder Prozent (%) für das Limit?</div>
-                 </div>
-                 <select class="cfg-select" .value="${this.config.generic_limit_type || 'watt'}"
-                   @change="${(e) => this.config = { ...this.config, generic_limit_type: e.target.value }}">
-                    <option value="watt">Watt (W)</option>
-                    <option value="percent">Prozent (%)</option>
-                 </select>
-              </div>
-            `}
-         </div>
+             ${this.config.inverter_type === 'hoymiles' ? html`
+                <div class="cfg-row">
+                   <div class="cfg-info">
+                      <div class="cfg-label">Ziel-Inverter</div>
+                      <div class="cfg-desc">Alle oder spezifische Seriennummer.</div>
+                   </div>
+                   <select class="cfg-select" .value="${this.config.selected_inverter || 'all'}"
+                     @change="${(e) => this.config = { ...this.config, selected_inverter: e.target.value }}">
+                      <option value="all">Alle Geräte</option>
+                      ${this._availableInverters.map(sn => html`<option value="${sn}">${sn}</option>`)}
+                   </select>
+                </div>
+             ` : html`
+                <div class="cfg-row column">
+                   <div class="cfg-info">
+                      <div class="cfg-label">External Limit Entity</div>
+                   </div>
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Number / Limit Entity" .value="${this.config.external_limit_entity}"
+                     @value-changed="${(e) => this.config = { ...this.config, external_limit_entity: e.detail.value }}"></hoymiles-entity-picker>
+                </div>
+                <div class="cfg-row">
+                   <div class="cfg-info">
+                      <div class="cfg-label">Limit Einheit</div>
+                   </div>
+                   <select class="cfg-select" .value="${this.config.generic_limit_type || 'watt'}"
+                     @change="${(e) => this.config = { ...this.config, generic_limit_type: e.target.value }}">
+                      <option value="watt">Watt (W)</option>
+                      <option value="percent">Prozent (%)</option>
+                   </select>
+                </div>
+             `}
+          </div>
 
-        <div class="config-section glass">
-           <div class="section-title">📡 SENSOR ZUORDNUNG</div>
-           <p class="section-lead">Verknüpfe hier deine Home Assistant Sensoren für das Dashboard.</p>
+          <!-- INTELLIGENZ & LIMITS -->
+          <div class="config-section glass">
+             <div class="section-title"><ha-icon icon="mdi:brain"></ha-icon> INTELLIGENZ</div>
+             
+             <div class="cfg-row">
+                <div class="cfg-info">
+                   <div class="cfg-label">Ziel-Bezug am Zähler</div>
+                   <div class="cfg-desc">Gewünschter Wert in Watt (z.B. 10W Netzbezug).</div>
+                </div>
+                <div class="input-wrap">
+                   <input type="number" class="cfg-num" .value="${this.config.target_grid_watt || 0}"
+                     @change="${(e) => this.config = { ...this.config, target_grid_watt: e.target.value }}">
+                   <span class="unit-tag">W</span>
+                </div>
+             </div>
+
+             <div class="cfg-row">
+                <div class="cfg-info">
+                   <div class="cfg-label">Maximale Kapazität</div>
+                   <div class="cfg-desc">Max. AC-Leistung aller WR (z.B. 800W).</div>
+                </div>
+                <div class="input-wrap">
+                   <input type="number" class="cfg-num" .value="${this.config.max_capacity || 800}"
+                     @change="${(e) => this.config = { ...this.config, max_capacity: e.target.value }}">
+                   <span class="unit-tag">W</span>
+                </div>
+             </div>
+
+             <div class="info-box-neon">
+                <ha-icon icon="mdi:information-outline"></ha-icon>
+                <span>Die Automatik (ZEN) berechnet sekündlich das optimale Limit für deine Wechselrichter.</span>
+             </div>
+          </div>
+        </div>
+
+        <!-- SENSORIK Sektion -->
+        <div class="config-section glass sensor-section">
+           <div class="section-title"><ha-icon icon="mdi:nas"></ha-icon> SENSOR ZUORDNUNG</div>
+           <p class="section-lead">Wähle hier deine Home Assistant Sensoren aus. Die Skalierung erlaubt die Umrechnung von kW zu W.</p>
            
            <div class="picker-grid">
-              <div class="p-group">
-                <hoymiles-entity-picker .hass="${this.hass}" label="Solar Produktion" .value="${this.config.solar_power_sensor}"
+              <div class="p-card">
+                <div class="p-head"><ha-icon icon="mdi:solar-power"></ha-icon> Solar Leistung (W)</div>
+                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.solar_power_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, solar_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="unit-row">
+                <div class="u-sel">
                    <select @change="${(e) => this.config = { ...this.config, solar_power_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.solar_power_scale === 'none'}">Einheit: Watt (W)</option>
-                      <option value="kw_to_w" ?selected="${this.config.solar_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
-                      <option value="w_to_kw" ?selected="${this.config.solar_power_scale === 'w_to_kw'}">Eingang ist W -> Zu kW wandeln</option>
+                      <option value="none" ?selected="${this.config.solar_power_scale === 'none'}">Daten sind in Watt</option>
+                      <option value="kw_to_w" ?selected="${this.config.solar_power_scale === 'kw_to_w'}">Eingang ist kW -> zu W</option>
                    </select>
                 </div>
               </div>
 
-              <div class="p-group">
-                <hoymiles-entity-picker .hass="${this.hass}" label="Solar Heute Ertrag" .value="${this.config.solar_energy_yield_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, solar_energy_yield_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="unit-row">
-                   <select @change="${(e) => this.config = { ...this.config, solar_yield_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.solar_yield_scale === 'none'}">Einheit: kWh</option>
-                      <option value="w_to_kw" ?selected="${this.config.solar_yield_scale === 'w_to_kw'}">Eingang ist Wh -> Zu kWh wandeln</option>
-                      <option value="kw_to_w" ?selected="${this.config.solar_yield_scale === 'kw_to_w'}">Eingang ist kWh -> Zu Wh wandeln</option>
-                   </select>
-                </div>
-              </div>
-
-              <div class="p-group">
-                <hoymiles-entity-picker .hass="${this.hass}" label="Stromzähler Power" .value="${this.config.grid_sensor}"
+              <div class="p-card">
+                <div class="p-head"><ha-icon icon="mdi:transmission-tower"></ha-icon> Stromzähler (W)</div>
+                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.grid_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, grid_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="unit-row">
+                <div class="u-sel">
                    <select @change="${(e) => this.config = { ...this.config, grid_power_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">Einheit: Watt (W)</option>
-                      <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
-                      <option value="w_to_kw" ?selected="${this.config.grid_power_scale === 'w_to_kw'}">Eingang ist W -> Zu kW wandeln</option>
+                      <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">Daten sind in Watt</option>
+                      <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">Eingang ist kW -> zu W</option>
                    </select>
                 </div>
               </div>
 
-              <div class="p-group">
-                <hoymiles-entity-picker .hass="${this.hass}" label="Netz Import Heute" .value="${this.config.grid_energy_import_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, grid_energy_import_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="unit-row">
-                   <select @change="${(e) => this.config = { ...this.config, grid_import_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.grid_import_scale === 'none'}">Einheit: kWh</option>
-                      <option value="w_to_kw" ?selected="${this.config.grid_import_scale === 'w_to_kw'}">Eingang ist Wh -> Zu kWh wandeln</option>
-                      <option value="kw_to_w" ?selected="${this.config.grid_import_scale === 'kw_to_w'}">Eingang ist kWh -> Zu Wh wandeln</option>
-                   </select>
-                </div>
-              </div>
-
-              <div class="p-group">
-                <hoymiles-entity-picker .hass="${this.hass}" label="Netz Export Heute" .value="${this.config.grid_energy_export_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, grid_energy_export_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="unit-row">
-                   <select @change="${(e) => this.config = { ...this.config, grid_export_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.grid_export_scale === 'none'}">Einheit: kWh</option>
-                      <option value="w_to_kw" ?selected="${this.config.grid_export_scale === 'w_to_kw'}">Eingang ist Wh -> Zu kWh wandeln</option>
-                      <option value="kw_to_w" ?selected="${this.config.grid_export_scale === 'kw_to_w'}">Eingang ist kWh -> Zu Wh wandeln</option>
-                   </select>
-                </div>
-              </div>
-
-              <div class="p-group">
-                <hoymiles-entity-picker .hass="${this.hass}" label="Batterie Power" .value="${this.config.battery_power_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="unit-row">
-                   <select @change="${(e) => this.config = { ...this.config, battery_power_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.battery_power_scale === 'none'}">Einheit: Watt (W)</option>
-                      <option value="kw_to_w" ?selected="${this.config.battery_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
-                      <option value="w_to_kw" ?selected="${this.config.battery_power_scale === 'w_to_kw'}">Eingang ist W -> Zu kW wandeln</option>
-                   </select>
-                </div>
-              </div>
-
-              <div class="p-group">
-                <hoymiles-entity-picker .hass="${this.hass}" label="Batterie SOC (%)" .value="${this.config.battery_soc_sensor}"
+              <div class="p-card">
+                <div class="p-head"><ha-icon icon="mdi:battery-high"></ha-icon> Batterie SOC (%)</div>
+                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.battery_soc_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, battery_soc_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
+
+              <div class="p-card">
+                <div class="p-head"><ha-icon icon="mdi:battery-charging"></ha-icon> Batterie Leistung (W)</div>
+                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.battery_power_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
+
+              <div class="p-card">
+                <div class="p-head"><ha-icon icon="mdi:chart-line"></ha-icon> Solar Ertrag Heute</div>
+                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.solar_energy_yield_sensor}"
+                  @value-changed="${(e) => this.config = { ...this.config, solar_energy_yield_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                <div class="u-sel">
+                   <select @change="${(e) => this.config = { ...this.config, solar_yield_scale: e.target.value }}">
+                      <option value="none" ?selected="${this.config.solar_yield_scale === 'none'}">Daten sind in kWh</option>
+                      <option value="w_to_kw" ?selected="${this.config.solar_yield_scale === 'w_to_kw'}">Eingang ist Wh -> zu kWh</option>
+                   </select>
+                </div>
               </div>
            </div>
         </div>
 
-        <button class="mega-save-btn" @click="${this._saveConfig}">EINSTELLUNGEN ÜBERNEHMEN</button>
+        <button class="mega-save-btn" @click="${this._saveConfig}">
+           <ha-icon icon="mdi:content-save-check"></ha-icon>
+           EINSTELLUNGEN ÜBERNEHMEN
+        </button>
       </div>
     `;
   }
@@ -841,42 +848,64 @@ class HoymilesCYDPanel extends LitElement {
       .s-row span:first-child { color: var(--text-dim); font-weight: 500; }
       .s-row span:last-child { font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
 
-      /* --- SETTINGS --- */
-      .settings-page { max-width: 1000px; margin: 0 auto; animation: slideUp 0.6s ease-out; }
+      .settings-page { max-width: 1200px; margin: 0 auto; animation: slideUp 0.6s ease-out; }
       @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
       
-      .config-section { padding: 45px; margin-bottom: 35px; }
-      .section-title { color: var(--accent); font-weight: 800; margin-bottom: 40px; font-size: 1.25em; letter-spacing: 1px; display: flex; align-items: center; gap: 12px; }
+      .setup-header { margin-bottom: 40px; border-left: 4px solid var(--accent); padding-left: 25px; }
+      .setup-title { font-size: 1.8em; font-weight: 900; letter-spacing: 2px; color: #fff; }
+      .setup-step { font-size: 1em; color: var(--text-dim); margin-top: 5px; }
+
+      .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+      .config-section { padding: 40px; position: relative; }
+      .section-title { color: var(--accent); font-weight: 800; margin-bottom: 30px; font-size: 1.25em; letter-spacing: 1px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; }
       .section-lead { color: var(--text-dim); margin-bottom: 35px; font-size: 1.1em; line-height: 1.6; }
 
-      .cfg-row { display: flex; justify-content: space-between; align-items: center; padding: 25px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-      .cfg-label { font-size: 1.15em; font-weight: 700; color: #fff; margin-bottom: 6px; }
-      .cfg-desc { font-size: 0.9em; color: var(--text-dim); }
+      .cfg-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 20px; }
+      .cfg-row.column { flex-direction: column; align-items: stretch; }
+      .cfg-label { font-size: 1.1em; font-weight: 700; color: #fff; margin-bottom: 4px; }
+      .cfg-desc { font-size: 0.85em; color: var(--text-dim); }
+      
+      .input-wrap { position: relative; display: flex; align-items: center; }
+      .unit-tag { position: absolute; right: 15px; color: var(--accent); font-weight: 800; font-size: 0.9em; pointer-events: none; }
+
       .cfg-num { 
-        background: #000; border: 1.5px solid var(--glass-border); color: #fff; 
-        padding: 14px 20px; border-radius: 12px; width: 120px; text-align: center; 
+        background: rgba(0,0,0,0.3); border: 1.5px solid var(--glass-border); color: #fff; 
+        padding: 12px 20px; border-radius: 12px; width: 140px; text-align: left; 
         font-family: 'JetBrains Mono', monospace; font-size: 1.1em; outline: none; transition: 0.3s;
       }
-      .cfg-num:focus { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
+      .cfg-num:focus { border-color: var(--accent); background: #000; box-shadow: 0 0 15px var(--accent-glow); }
       
       .cfg-select {
-        background: #000; border: 1.5px solid var(--glass-border); color: #fff; 
-        padding: 14px 20px; border-radius: 12px; min-width: 200px;
-        font-family: 'Outfit', sans-serif; font-size: 1em; outline: none; transition: 0.3s;
+        background: rgba(40,40,45,0.5); border: 1.5px solid var(--glass-border); color: #fff; 
+        padding: 12px 18px; border-radius: 12px; min-width: 180px;
+        font-family: 'Outfit', sans-serif; font-size: 0.95em; outline: none; transition: 0.3s;
         cursor: pointer;
       }
+      .cfg-select:hover { border-color: rgba(255,255,255,0.2); }
       .cfg-select:focus { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
       
-      .picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 35px; }
-      
+      .info-box-neon { 
+        margin-top: 30px; padding: 20px; background: rgba(0, 210, 255, 0.05); 
+        border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 18px; 
+        display: flex; gap: 15px; align-items: center; color: var(--neon-blue); font-size: 0.9em; line-height: 1.4;
+      }
+
+      /* SENSOR CARDS */
+      .picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+      .p-card { background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; transition: 0.3s; }
+      .p-card:hover { background: rgba(255,255,255,0.04); border-color: var(--accent); }
+      .p-head { font-size: 0.9em; font-weight: 800; margin-bottom: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
+      .u-sel { margin-top: 15px; }
+      .u-sel select { width: 100%; background: #000; color: var(--text-dim); border: 1px solid var(--glass-border); padding: 8px; border-radius: 10px; outline: none; font-size: 0.8em; }
+
       .mega-save-btn { 
         width: 100%; padding: 24px; background: linear-gradient(135deg, var(--accent) 0%, #ff6e00 100%); 
         border: none; border-radius: 20px; color: #fff; font-weight: 800; cursor: pointer; 
-        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); font-size: 1.2em; letter-spacing: 2px;
-        box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 20px var(--accent-glow); margin-top: 20px;
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); font-size: 1.25em; letter-spacing: 2px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 20px var(--accent-glow); margin-top: 40px;
+        display: flex; align-items: center; justify-content: center; gap: 15px;
       }
-      .mega-save-btn:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 20px 50px rgba(0,0,0,0.7), 0 0 40px var(--accent-glow); }
-      .mega-save-btn:active { transform: translateY(2px); }
+      .mega-save-btn:hover { transform: translateY(-5px); box-shadow: 0 20px 50px rgba(0,0,0,0.7), 0 0 40px var(--accent-glow); }
 
       .green { color: #2ecc71 !important; }
       .red { color: #e74c3c !important; }
