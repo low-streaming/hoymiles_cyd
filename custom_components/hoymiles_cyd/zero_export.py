@@ -30,13 +30,14 @@ class ZeroExportManager:
         self.entry = entry
         self._enabled = False
         self._grid_sensor = None
-        self._target_watt = 0
-        self._min_limit = 10
-        self._max_limit = 100
+        self._target_watt = 0.0
+        self._min_limit = 10.0
+        self._max_limit = 100.0
         self._max_capacity = 800 # Default fallback
         self._unsub = None
         self._last_limit = None
         self._is_updating = False
+        self._config = {}
 
     @property
     def status(self) -> str:
@@ -73,14 +74,14 @@ class ZeroExportManager:
             self.stop()
 
     @property
-    def target_power(self) -> int:
+    def target_power(self) -> float:
         """Return target power."""
         return self._target_watt
 
     @target_power.setter
-    def target_power(self, value: int):
+    def target_power(self, value: float):
         """Set target power."""
-        self._target_watt = value
+        self._target_watt = float(value)
 
     async def async_setup(self):
         """Set up the zero export logic."""
@@ -105,7 +106,9 @@ class ZeroExportManager:
 
         config = await self.hass.async_add_executor_job(load_json)
         if config:
+            self._config = config
             self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
+            self._target_watt = float(config.get("target_grid_watt", self._target_watt))
 
         if self._enabled and self._grid_sensor:
             _LOGGER.info(f"Setting up Zero Export for {self._grid_sensor} (Target: {self._target_watt}W)")
@@ -122,7 +125,9 @@ class ZeroExportManager:
     def update_config(self, config: dict):
         """Update configuration from external source (Panel)."""
         _LOGGER.info(f"Updating Zero Export configuration from Panel: {config}")
+        self._config = config
         new_sensor = config.get("grid_sensor")
+        self._target_watt = float(config.get("target_grid_watt", self._target_watt))
         
         if new_sensor and new_sensor != self._grid_sensor:
             self.stop()
@@ -145,6 +150,9 @@ class ZeroExportManager:
 
         try:
             grid_power = float(new_state.state)
+            scale = self._config.get("grid_power_scale")
+            if scale == "kw_to_w": grid_power *= 1000
+            elif scale == "w_to_kw": grid_power /= 1000
         except ValueError:
             return
 
@@ -180,11 +188,16 @@ class ZeroExportManager:
             
             # If still 0, try to find the actual sensor state
             if current_production == 0:
-                states = self.hass.states.get(f"sensor.solar_inverter_ac_power") # Neutral name check
-                if not states:
-                     states = self.hass.states.get(f"sensor.hoymiles_cyd_ac_power")
+                sensor_id = self._config.get("solar_power_sensor")
+                if not sensor_id:
+                   sensor_id = f"sensor.hoymiles_cyd_ac_power"
+                
+                states = self.hass.states.get(sensor_id)
                 if states and states.state not in ("unavailable", "unknown"):
                     current_production = float(states.state)
+                    scale = self._config.get("solar_power_scale")
+                    if scale == "kw_to_w": current_production *= 1000
+                    elif scale == "w_to_kw": current_production /= 1000
 
             # Desired Production = Current + Grid - Target
             # grid_power > 0 (Import), grid_power < 0 (Export)

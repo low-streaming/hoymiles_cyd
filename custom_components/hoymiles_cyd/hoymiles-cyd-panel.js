@@ -229,15 +229,24 @@ class HoymilesCYDPanel extends LitElement {
   }
 
   renderDashboard() {
+    const getScaled = (entityId, scale) => {
+      const state = this.hass.states[entityId];
+      if (!state || state.state === 'unavailable' || state.state === 'unknown') return 0;
+      let val = parseFloat(state.state) || 0;
+      if (scale === 'kw_to_w') return val * 1000;
+      if (scale === 'w_to_kw') return val / 1000;
+      return val;
+    };
+
     // Current Power (Watts)
-    const grid_p = parseFloat(this.hass.states[this.config.grid_sensor]?.state) || 0;
-    const solar_p = parseFloat(this.hass.states[this.config.solar_power_sensor || 'sensor.hoymiles_cyd_ac_power']?.state) || 0;
-    const batt_p = parseFloat(this.hass.states[this.config.battery_power_sensor]?.state) || 0;
+    const grid_p = getScaled(this.config.grid_sensor, this.config.grid_power_scale);
+    const solar_p = getScaled(this.config.solar_power_sensor || 'sensor.hoymiles_cyd_ac_power', this.config.solar_power_scale);
+    const batt_p = getScaled(this.config.battery_power_sensor, this.config.battery_power_scale);
 
     // Energy (kWh)
-    const yield_today = this.hass.states[this.config.solar_energy_yield_sensor || 'sensor.hoymiles_cyd_today_yield']?.state || '0';
-    const import_today = this.hass.states[this.config.grid_energy_import_sensor]?.state || '0';
-    const export_today = this.hass.states[this.config.grid_energy_export_sensor]?.state || '0';
+    const yield_today = getScaled(this.config.solar_energy_yield_sensor || 'sensor.hoymiles_cyd_today_yield', this.config.solar_yield_scale);
+    const import_today = getScaled(this.config.grid_energy_import_sensor, this.config.grid_import_scale);
+    const export_today = getScaled(this.config.grid_energy_export_sensor, this.config.grid_export_scale);
     const battery_soc = this.hass.states[this.config.battery_soc_sensor]?.state || null;
 
     const inverter_temp = this.hass.states['sensor.hoymiles_cyd_temperature']?.state || '--';
@@ -255,11 +264,11 @@ class HoymilesCYDPanel extends LitElement {
             <div class="labels-top">
               <div class="box">
                 <span class="lab">Solar Produktion</span>
-                <span class="val orange">${(solar_p / 1000).toFixed(2)} kW</span>
+                <span class="val neon-orange">${(solar_p / 1000).toFixed(2)} kW</span>
               </div>
               <div class="box right">
                 <span class="lab">Haus Verbrauch</span>
-                <span class="val">${(house_consumption / 1000).toFixed(2)} kW</span>
+                <span class="val neon-blue">${(house_consumption / 1000).toFixed(2)} kW</span>
               </div>
             </div>
 
@@ -270,6 +279,11 @@ class HoymilesCYDPanel extends LitElement {
                     <stop offset="0%" style="stop-color:var(--accent);stop-opacity:0.3" />
                     <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0" />
                   </linearGradient>
+                  
+                  <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
                 </defs>
                 <!-- Static Paths -->
                 <path d="M 120 100 Q 300 100 300 210" class="pth" />
@@ -279,48 +293,46 @@ class HoymilesCYDPanel extends LitElement {
                 
                 <!-- Active Flows -->
                 ${solar_p > 20 ? html`
-                  <path d="M 120 100 Q 300 100 300 210" class="pth-active" />
-                  <circle r="5" fill="url(#solarPart)">
+                  <path d="M 120 100 Q 300 100 300 210" class="pth-active neon-orange-stroke" />
+                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-orange-glow">
                     <animateMotion dur="${Math.max(0.5, 3 - solar_p / 1000)}s" repeatCount="indefinite" path="M 120 100 Q 300 100 300 210" />
                   </circle>
-                  <radialGradient id="solarPart"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="var(--accent)"/></radialGradient>
                 ` : ''}
                 
                 ${house_consumption > 20 ? html`
-                  <path d="M 480 100 Q 300 100 300 210" class="pth-active" style="animation-direction: reverse;" />
-                  <circle r="5" fill="#fff">
+                  <path d="M 480 100 Q 300 100 300 210" class="pth-active neon-blue-stroke" style="animation-direction: reverse;" />
+                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-blue-glow">
                     <animateMotion dur="${Math.max(0.5, 3 - house_consumption / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 100 480 100" />
-                    <filter><feGaussianBlur stdDeviation="2"/></filter>
                   </circle>
                 ` : ''}
 
                 ${grid_p > 20 ? html`
-                  <path d="M 120 320 Q 300 320 300 210" class="pth-active" />
-                  <circle r="5" fill="#888">
+                  <path d="M 120 320 Q 300 320 300 210" class="pth-active neon-pink-stroke" />
+                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-pink-glow">
                     <animateMotion dur="${Math.max(0.5, 4 - grid_p / 1000)}s" repeatCount="indefinite" path="M 120 320 Q 300 320 300 210" />
                   </circle>
                 ` : html`${grid_p < -20 ? html`
-                  <path d="M 120 320 Q 300 320 300 210" class="pth-active" style="animation-direction: reverse;" />
-                  <circle r="5" fill="var(--accent)">
+                  <path d="M 120 320 Q 300 320 300 210" class="pth-active neon-cyan-stroke" style="animation-direction: reverse;" />
+                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-cyan-glow">
                     <animateMotion dur="${Math.max(0.5, 4 - Math.abs(grid_p) / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 320 120 320" />
                   </circle>
                 ` : ''}`}
 
                 ${Math.abs(batt_p) > 20 ? html`
-                  <path d="M 480 320 Q 300 320 300 210" class="pth-active" style="${batt_p > 0 ? 'animation-direction: reverse;' : ''}" />
-                  <circle r="5" fill="#2ecc71">
+                  <path d="M 480 320 Q 300 320 300 210" class="pth-active neon-green-stroke" style="${batt_p > 0 ? 'animation-direction: reverse;' : ''}" />
+                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-green-glow">
                     <animateMotion dur="${Math.max(0.5, 4 - Math.abs(batt_p) / 1000)}s" repeatCount="indefinite" 
                       path="${batt_p > 0 ? 'M 300 210 Q 300 320 480 320' : 'M 480 320 Q 300 320 300 210'}" />
                   </circle>
                 ` : ''}
               </svg>
 
-              <div class="node n-solar" style="top: 68px; left: 88px;"><ha-icon icon="mdi:solar-panel-large"></ha-icon></div>
-              <div class="node n-house" style="top: 68px; right: 88px;"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
-              <div class="node n-grid" style="bottom: 68px; left: 88px;"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
-              <div class="node n-batt" style="bottom: 68px; right: 88px;">
+              <div class="node n-solar neon-border-orange" style="top: 68px; left: 88px;"><ha-icon icon="mdi:solar-panel-large"></ha-icon></div>
+              <div class="node n-house neon-border-blue" style="top: 68px; right: 88px;"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
+              <div class="node n-grid neon-border-pink" style="bottom: 68px; left: 88px;"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
+              <div class="node n-batt neon-border-green" style="bottom: 68px; right: 88px;">
                 <ha-icon icon="mdi:battery-high"></ha-icon>
-                ${battery_soc ? html`<div class="soc-tag">${battery_soc}%</div>` : ''}
+                ${battery_soc ? html`<div class="soc-tag neon-bg-green">${battery_soc}%</div>` : ''}
               </div>
 
               <div class="gauge-center">
@@ -336,7 +348,16 @@ class HoymilesCYDPanel extends LitElement {
                 </div>
               </div>
             </div>
+
+            <div class="flow-legend">
+              <div class="leg-item"><span class="dot neon-orange-bg"></span> Solar</div>
+              <div class="leg-item"><span class="dot neon-blue-bg"></span> Haus</div>
+              <div class="leg-item"><span class="dot neon-pink-bg"></span> Netz Import</div>
+              <div class="leg-item"><span class="dot neon-cyan-bg"></span> Netz Export</div>
+              <div class="leg-item"><span class="dot neon-green-bg"></span> Batterie</div>
+            </div>
           </div>
+
 
           <div class="graph-area">
              <div class="graph-info">
@@ -359,7 +380,7 @@ class HoymilesCYDPanel extends LitElement {
               <div class="s-icon"><ha-icon icon="mdi:server-network"></ha-icon></div>
               <div class="s-vals">
                 <div class="s-row"><span>Status</span> <span class="green">AKTIV ●</span></div>
-                <div class="s-row"><span>Heute Ertrag</span> <span>${yield_today} kWh</span></div>
+                <div class="s-row"><span>Heute Ertrag</span> <span>${yield_today.toFixed(2)} kWh</span></div>
                 <div class="s-row"><span>Temperatur</span> <span>${inverter_temp}°C</span></div>
               </div>
             </div>
@@ -370,8 +391,8 @@ class HoymilesCYDPanel extends LitElement {
             <div class="s-flex">
               <div class="s-icon orange"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Netz Bezug</span> <span>${import_today} kWh</span></div>
-                <div class="s-row"><span>Netz Einspeisung</span> <span>${export_today} kWh</span></div>
+                <div class="s-row"><span>Netz Bezug</span> <span>${import_today.toFixed(2)} kWh</span></div>
+                <div class="s-row"><span>Netz Einspeisung</span> <span>${export_today.toFixed(2)} kWh</span></div>
               </div>
             </div>
           </div>
@@ -442,6 +463,7 @@ class HoymilesCYDPanel extends LitElement {
                    <select @change="${(e) => this.config = { ...this.config, solar_power_scale: e.target.value }}">
                       <option value="none" ?selected="${this.config.solar_power_scale === 'none'}">Einheit: Watt (W)</option>
                       <option value="kw_to_w" ?selected="${this.config.solar_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
+                      <option value="w_to_kw" ?selected="${this.config.solar_power_scale === 'w_to_kw'}">Eingang ist W -> Zu kW wandeln</option>
                    </select>
                 </div>
               </div>
@@ -453,6 +475,7 @@ class HoymilesCYDPanel extends LitElement {
                    <select @change="${(e) => this.config = { ...this.config, solar_yield_scale: e.target.value }}">
                       <option value="none" ?selected="${this.config.solar_yield_scale === 'none'}">Einheit: kWh</option>
                       <option value="w_to_kw" ?selected="${this.config.solar_yield_scale === 'w_to_kw'}">Eingang ist Wh -> Zu kWh wandeln</option>
+                      <option value="kw_to_w" ?selected="${this.config.solar_yield_scale === 'kw_to_w'}">Eingang ist kWh -> Zu Wh wandeln</option>
                    </select>
                 </div>
               </div>
@@ -464,6 +487,7 @@ class HoymilesCYDPanel extends LitElement {
                    <select @change="${(e) => this.config = { ...this.config, grid_power_scale: e.target.value }}">
                       <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">Einheit: Watt (W)</option>
                       <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
+                      <option value="w_to_kw" ?selected="${this.config.grid_power_scale === 'w_to_kw'}">Eingang ist W -> Zu kW wandeln</option>
                    </select>
                 </div>
               </div>
@@ -471,16 +495,37 @@ class HoymilesCYDPanel extends LitElement {
               <div class="p-group">
                 <hoymiles-entity-picker .hass="${this.hass}" label="Netz Import Heute" .value="${this.config.grid_energy_import_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, grid_energy_import_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                <div class="unit-row">
+                   <select @change="${(e) => this.config = { ...this.config, grid_import_scale: e.target.value }}">
+                      <option value="none" ?selected="${this.config.grid_import_scale === 'none'}">Einheit: kWh</option>
+                      <option value="w_to_kw" ?selected="${this.config.grid_import_scale === 'w_to_kw'}">Eingang ist Wh -> Zu kWh wandeln</option>
+                      <option value="kw_to_w" ?selected="${this.config.grid_import_scale === 'kw_to_w'}">Eingang ist kWh -> Zu Wh wandeln</option>
+                   </select>
+                </div>
               </div>
 
               <div class="p-group">
                 <hoymiles-entity-picker .hass="${this.hass}" label="Netz Export Heute" .value="${this.config.grid_energy_export_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, grid_energy_export_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                <div class="unit-row">
+                   <select @change="${(e) => this.config = { ...this.config, grid_export_scale: e.target.value }}">
+                      <option value="none" ?selected="${this.config.grid_export_scale === 'none'}">Einheit: kWh</option>
+                      <option value="w_to_kw" ?selected="${this.config.grid_export_scale === 'w_to_kw'}">Eingang ist Wh -> Zu kWh wandeln</option>
+                      <option value="kw_to_w" ?selected="${this.config.grid_export_scale === 'kw_to_w'}">Eingang ist kWh -> Zu Wh wandeln</option>
+                   </select>
+                </div>
               </div>
 
               <div class="p-group">
                 <hoymiles-entity-picker .hass="${this.hass}" label="Batterie Power" .value="${this.config.battery_power_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                <div class="unit-row">
+                   <select @change="${(e) => this.config = { ...this.config, battery_power_scale: e.target.value }}">
+                      <option value="none" ?selected="${this.config.battery_power_scale === 'none'}">Einheit: Watt (W)</option>
+                      <option value="kw_to_w" ?selected="${this.config.battery_power_scale === 'kw_to_w'}">Eingang ist kW -> Zu W wandeln</option>
+                      <option value="w_to_kw" ?selected="${this.config.battery_power_scale === 'w_to_kw'}">Eingang ist W -> Zu kW wandeln</option>
+                   </select>
+                </div>
               </div>
 
               <div class="p-group">
@@ -532,15 +577,60 @@ class HoymilesCYDPanel extends LitElement {
         --bg-panel: rgba(18, 18, 22, 0.75);
         --glass-border: rgba(255, 255, 255, 0.08);
         --text-dim: #8e8e93;
+        
+        --neon-orange: #ff9d00;
+        --neon-blue: #00d2ff;
+        --neon-green: #39ff14;
+        --neon-pink: #ff007f;
+        --neon-cyan: #00f3ff;
+        
         overflow-x: hidden;
       }
+
+      .neon-orange { color: var(--neon-orange); filter: drop-shadow(0 0 10px var(--neon-orange)); }
+      .neon-blue { color: var(--neon-blue); filter: drop-shadow(0 0 10px var(--neon-blue)); }
+      .neon-green { color: var(--neon-green); filter: drop-shadow(0 0 10px var(--neon-green)); }
+      .neon-pink { color: var(--neon-pink); filter: drop-shadow(0 0 10px var(--neon-pink)); }
+      
+      .neon-orange-stroke { stroke: var(--neon-orange) !important; filter: drop-shadow(0 0 5px var(--neon-orange)); }
+      .neon-blue-stroke { stroke: var(--neon-blue) !important; filter: drop-shadow(0 0 5px var(--neon-blue)); }
+      .neon-pink-stroke { stroke: var(--neon-pink) !important; filter: drop-shadow(0 0 5px var(--neon-pink)); }
+      .neon-cyan-stroke { stroke: var(--neon-cyan) !important; filter: drop-shadow(0 0 5px var(--neon-cyan)); }
+      .neon-green-stroke { stroke: var(--neon-green) !important; filter: drop-shadow(0 0 5px var(--neon-green)); }
+
+      .neon-orange-glow { fill: var(--neon-orange) !important; }
+      .neon-blue-glow { fill: var(--neon-blue) !important; }
+      .neon-pink-glow { fill: var(--neon-pink) !important; }
+      .neon-cyan-glow { fill: var(--neon-cyan) !important; }
+      .neon-green-glow { fill: var(--neon-green) !important; }
+
+      .neon-border-orange { border-color: var(--neon-orange) !important; box-shadow: 0 0 15px rgba(255, 157, 0, 0.2) !important; color: var(--neon-orange); }
+      .neon-border-blue { border-color: var(--neon-blue) !important; box-shadow: 0 0 15px rgba(0, 210, 255, 0.2) !important; color: var(--neon-blue); }
+      .neon-border-pink { border-color: var(--neon-pink) !important; box-shadow: 0 0 15px rgba(255, 0, 127, 0.2) !important; color: var(--neon-pink); }
+      .neon-border-green { border-color: var(--neon-green) !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.2) !important; color: var(--neon-green); }
+
+      .neon-bg-green { background: var(--neon-green) !important; color: #000; box-shadow: 0 0 15px var(--neon-green); }
+
+      .flow-legend { 
+        display: flex; justify-content: center; gap: 20px; margin-top: 30px; 
+        padding: 15px; background: rgba(0,0,0,0.2); border-radius: 15px; border: 1px solid var(--glass-border);
+      }
+      .leg-item { display: flex; align-items: center; gap: 8px; font-size: 0.8em; font-weight: 600; color: var(--text-dim); }
+      .dot { width: 10px; height: 10px; border-radius: 50%; }
+      .neon-orange-bg { background: var(--neon-orange); box-shadow: 0 0 8px var(--neon-orange); }
+      .neon-blue-bg { background: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
+      .neon-pink-bg { background: var(--neon-pink); box-shadow: 0 0 8px var(--neon-pink); }
+      .neon-cyan-bg { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); }
+      .neon-green-bg { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
 
       .p-group { border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; background: rgba(255,255,255,0.02); }
       .unit-row { margin-top: 10px; display: flex; gap: 10px; }
       .unit-row select { 
         background: #000; color: #fff; border: 1px solid var(--accent); 
-        padding: 5px 10px; border-radius: 8px; font-size: 0.8em; outline: none;
+        padding: 8px 12px; border-radius: 8px; font-size: 0.8em; outline: none; width: 100%;
+        cursor: pointer; transition: 0.3s;
       }
+      .unit-row select:hover { border-color: #fff; background: #111; }
 
       * { box-sizing: border-box; }
 
