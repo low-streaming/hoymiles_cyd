@@ -132,7 +132,8 @@ class HoymilesCYDPanel extends LitElement {
       hass: { type: Object },
       activeTab: { type: String },
       config: { type: Object },
-      _historyData: { type: Array }
+      _historyData: { type: Array },
+      _availableInverters: { type: Array }
     };
   }
 
@@ -147,15 +148,19 @@ class HoymilesCYDPanel extends LitElement {
       solar_energy_yield_sensor: '',
       battery_soc_sensor: '',
       battery_power_sensor: '',
-      target_grid_watt: 10
+      target_grid_watt: 10,
+      operation_mode: 'zero_export',
+      selected_inverter: 'all'
     };
     this._historyData = [];
     this._configLoaded = false;
+    this._availableInverters = [];
   }
 
   updated(changedProps) {
     if (changedProps.has('hass') && this.hass && !this._configLoaded) {
       this._loadConfig();
+      this._loadInverters();
       this._configLoaded = true;
       this._fetchHistory();
       setInterval(() => this._fetchHistory(), 60000);
@@ -165,6 +170,13 @@ class HoymilesCYDPanel extends LitElement {
         pickers.forEach(p => p.open = false);
       });
     }
+  }
+
+  async _loadInverters() {
+    try {
+      const resp = await this.hass.callApi('GET', 'hoymiles_cyd_inverters');
+      this._availableInverters = resp.inverters || [];
+    } catch (e) { console.error("Failed to load inverters", e); }
   }
 
   async _loadConfig() {
@@ -449,7 +461,32 @@ class HoymilesCYDPanel extends LitElement {
               <input type="number" class="cfg-num" .value="${this.config.target_grid_watt || 0}"
                 @change="${(e) => this.config = { ...this.config, target_grid_watt: e.target.value }}">
            </div>
-        </div>
+
+            <div class="cfg-row">
+               <div class="cfg-info">
+                  <div class="cfg-label">Betriebsmodus</div>
+                  <div class="cfg-desc">Wähle zwischen Automatisierung (ZEN) oder manuellem Test.</div>
+               </div>
+               <select class="cfg-select" .value="${this.config.operation_mode || 'zero_export'}"
+                 @change="${(e) => this.config = { ...this.config, operation_mode: e.target.value }}">
+                  <option value="zero_export">Nulleinspeisung (ZEN)</option>
+                  <option value="manual_limit">Manueller Festwert (%)</option>
+                  <option value="disabled">Inaktiv</option>
+               </select>
+            </div>
+
+            <div class="cfg-row">
+               <div class="cfg-info">
+                  <div class="cfg-label">Steuerungs-Ziel (WR)</div>
+                  <div class="cfg-desc">Wähle einen spezifischen Wechselrichter oder alle.</div>
+               </div>
+               <select class="cfg-select" .value="${this.config.selected_inverter || 'all'}"
+                 @change="${(e) => this.config = { ...this.config, selected_inverter: e.target.value }}">
+                  <option value="all">Alle Wechselrichter</option>
+                  ${this._availableInverters.map(sn => html`<option value="${sn}">Inverter: ${sn}</option>`)}
+               </select>
+            </div>
+         </div>
 
         <div class="config-section glass">
            <div class="section-title">📡 SENSOR ZUORDNUNG</div>
@@ -784,6 +821,14 @@ class HoymilesCYDPanel extends LitElement {
         font-family: 'JetBrains Mono', monospace; font-size: 1.1em; outline: none; transition: 0.3s;
       }
       .cfg-num:focus { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
+      
+      .cfg-select {
+        background: #000; border: 1.5px solid var(--glass-border); color: #fff; 
+        padding: 14px 20px; border-radius: 12px; min-width: 200px;
+        font-family: 'Outfit', sans-serif; font-size: 1em; outline: none; transition: 0.3s;
+        cursor: pointer;
+      }
+      .cfg-select:focus { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
       
       .picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 35px; }
       

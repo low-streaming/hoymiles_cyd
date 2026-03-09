@@ -24,6 +24,7 @@ async def async_setup_panel(hass: HomeAssistant):
     hass.http.register_view(HoymilesCYDPanelView())
     hass.http.register_view(HoymilesCYDSyncView())
     hass.http.register_view(HoymilesCYDConfigView())
+    hass.http.register_view(HoymilesCYDInvertersView())
 
     # Register the custom panel in the sidebar
     async_register_built_in_panel(
@@ -81,7 +82,18 @@ class HoymilesCYDConfigView(HomeAssistantView):
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            return {}
+            return {
+                "solar_power_sensor": "",
+                "solar_energy_yield_sensor": "",
+                "grid_sensor": "",
+                "grid_energy_import_sensor": "",
+                "grid_energy_export_sensor": "",
+                "battery_power_sensor": "",
+                "battery_soc_sensor": "",
+                "target_grid_watt": 10,
+                "operation_mode": "zero_export",
+                "selected_inverter": "all"
+            }
 
         config = await hass.async_add_executor_job(read_config)
         return web.json_response(config)
@@ -109,6 +121,25 @@ class HoymilesCYDConfigView(HomeAssistantView):
                 manager.update_config(data)
 
         return web.json_response({"status": "ok"})
+
+class HoymilesCYDInvertersView(HomeAssistantView):
+    """View to return list of inverters from the DTU configuration."""
+    url = "/api/hoymiles_cyd_inverters"
+    name = "api:hoymiles_cyd:inverters"
+    requires_auth = False
+
+    async def get(self, request):
+        hass = request.app["hass"]
+        from .const import DOMAIN, CONF_INVERTERS, CONF_THREE_PHASE_INVERTERS, CONF_HYBRID_INVERTERS
+        
+        inverters = []
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            data = entry.data
+            inverters.extend(data.get(CONF_INVERTERS, []))
+            inverters.extend(data.get(CONF_THREE_PHASE_INVERTERS, []))
+            inverters.extend(data.get(CONF_HYBRID_INVERTERS, []))
+            
+        return web.json_response({"inverters": list(set(inverters))})
 
 class HoymilesCYDSyncView(HomeAssistantView):
     """View to provide a unified state object for the CYD hardware display."""

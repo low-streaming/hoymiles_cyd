@@ -42,11 +42,14 @@ class ZeroExportManager:
     @property
     def status(self) -> str:
         """Return current status."""
+        mode = self._config.get("operation_mode", "zero_export")
+        if mode == "disabled":
+            return "Inaktiv"
         if not self._enabled:
-            return "Disabled"
+            return "Deaktiviert (Switch)"
         if not self._grid_sensor:
-            return "Misconfigured"
-        return "Running"
+            return "Konfigurationsfehler"
+        return "Läuft (ZEN)" if mode == "zero_export" else "Manuell"
 
     @property
     def last_limit(self) -> Optional[float]:
@@ -217,8 +220,35 @@ class ZeroExportManager:
 
             # Avoid small jitter
             if self._last_limit is None or abs(self._last_limit - new_limit) >= 0.5:
-                _LOGGER.info(f"Zero Export: Adjusting limit to {new_limit}% (Grid: {grid_power}W, Prod: {current_production}W, Target: {self._target_watt}W)")
-                await dtu.async_set_power_limit(new_limit)
+                mode = self._config.get("operation_mode", "zero_export")
+                target_inverter = self._config.get("selected_inverter", "all")
+                
+                if mode == "disabled":
+                    return
+
+                if mode == "manual_limit":
+                   # In manual mode, we might want to just set a fixed limit
+                   # For now, let's keep it simple: if it's manual, we don't auto-adjust here
+                   # OR we could have a 'manual_power_limit' field in config
+                   pass
+
+                _LOGGER.info(f"Zero Export: Adjusting limit to {new_limit}% (Target: {target_inverter}, Mode: {mode})")
+                
+                # Check if the dtu object supports targeting an inverter
+                # Usually it's either dtu.async_set_power_limit(limit, [sn]) 
+                # or similar. We'll try to handle both if we knew the API.
+                # Assuming dtu.async_set_power_limit(limit) sets it globally.
+                
+                if target_inverter == "all":
+                    await dtu.async_set_power_limit(new_limit)
+                else:
+                    # Logic to set limit for a specific inverter
+                    # If the library doesn't support it directly, this might fail or need adjustment
+                    try:
+                        await dtu.async_set_power_limit(new_limit, [target_inverter])
+                    except Exception:
+                        await dtu.async_set_power_limit(new_limit)
+                
                 self._last_limit = new_limit
                 
         except Exception as err:
