@@ -7,7 +7,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DOMAIN, HASS_ZERO_EXPORT_MANAGER
 
 PANEL_TITLE = "Nulleinspeisung Steuerung"
 PANEL_ICON = "mdi:solar-power-variant"
@@ -113,12 +113,12 @@ class HoymilesCYDConfigView(HomeAssistantView):
         # Clear cache
         hass.data[f"{DOMAIN}_cyd_config_cache"] = data
         
-        # Notify ZeroExportManager if it exists
-        from .const import HASS_ZERO_EXPORT_MANAGER
-        if DOMAIN in hass.data and HASS_ZERO_EXPORT_MANAGER in hass.data[DOMAIN]:
-            manager = hass.data[DOMAIN][HASS_ZERO_EXPORT_MANAGER]
-            if hasattr(manager, "update_config"):
-                manager.update_config(data)
+        # Notify ZeroExportManager(s) if they exist
+        for entry_id, entry_data in hass.data.get(DOMAIN, {}).items():
+            if isinstance(entry_data, dict) and HASS_ZERO_EXPORT_MANAGER in entry_data:
+                manager = entry_data[HASS_ZERO_EXPORT_MANAGER]
+                if hasattr(manager, "update_config"):
+                    manager.update_config(data)
 
         return web.json_response({"status": "ok"})
 

@@ -1847,6 +1847,8 @@ class HoymilesZeroExportSensor(SensorEntity):
         return {
             "last_limit": self._manager.last_limit,
             "target_watt": self._manager.entry.options.get(CONF_ZERO_EXPORT_TARGET, 0),
+            "operation_mode": self._manager._config.get("operation_mode", "zero_export"),
+            "is_enabled": self._manager.is_enabled
         }
 
 

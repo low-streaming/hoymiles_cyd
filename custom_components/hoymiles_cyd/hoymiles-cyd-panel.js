@@ -223,7 +223,10 @@ class HoymilesCYDPanel extends LitElement {
             <div class="logo-icon">⚡</div>
             <div class="logo-text">
               <h1>SYSTEM: S_STEUERUNG</h1>
-              <span class="version-tag">NULLEINSPEISUNG AKTIV</span>
+              <div class="status-badge">
+                <span class="status-dot ${zero_export_status.includes('Läuft') ? 'active' : ''}"></span>
+                <span class="status-text">${zero_export_status.toUpperCase()}</span>
+              </div>
             </div>
           </div>
           <div class="time-area">
@@ -689,6 +692,9 @@ class HoymilesCYDPanel extends LitElement {
     for (const id of ids) {
       if (this.hass.states[id]) {
         this._toggleSwitch(id);
+        // Optimistic update for UI feel
+        const newState = this.hass.states[id].state === 'on' ? 'off' : 'on';
+        this.requestUpdate();
         return;
       }
     }
@@ -743,6 +749,30 @@ class HoymilesCYDPanel extends LitElement {
       .neon-border-blue { border-color: var(--neon-blue) !important; box-shadow: 0 0 15px rgba(0, 210, 255, 0.2) !important; color: var(--neon-blue); }
       .neon-border-pink { border-color: var(--neon-pink) !important; box-shadow: 0 0 15px rgba(255, 0, 127, 0.2) !important; color: var(--neon-pink); }
       .neon-border-green { border-color: var(--neon-green) !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.2) !important; color: var(--neon-green); }
+      
+      .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ff4d4d;
+        box-shadow: 0 0 8px #ff4d4d;
+      }
+      .status-dot.active {
+        background: var(--neon-green);
+        box-shadow: 0 0 8px var(--neon-green);
+      }
+      .status-text {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: var(--text-dim);
+      }
 
       .neon-bg-green { background: var(--neon-green) !important; color: #000; box-shadow: 0 0 15px var(--neon-green); }
 
