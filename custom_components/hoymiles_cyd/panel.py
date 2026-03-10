@@ -91,6 +91,7 @@ class HoymilesCYDConfigView(HomeAssistantView):
                 "battery_power_sensor": "",
                 "battery_soc_sensor": "",
                 "target_grid_watt": 10,
+                "is_enabled": False,
                 "operation_mode": "zero_export",
                 "selected_inverter": "all"
             }
@@ -158,8 +159,11 @@ class HoymilesCYDSyncView(HomeAssistantView):
             def load_config():
                 if os.path.exists(config_path):
                     with open(config_path, "r", encoding="utf-8") as f:
-                        return json.load(f)
-                return {}
+                        data = json.load(f)
+                        if "is_enabled" not in data:
+                            data["is_enabled"] = False
+                        return data
+                return {"is_enabled": False}
             config = await hass.async_add_executor_job(load_config)
             hass.data[f"{DOMAIN}_cyd_config_cache"] = config
 
@@ -191,8 +195,13 @@ class HoymilesCYDSyncView(HomeAssistantView):
         # Zero Export Status
         ze_status = "Deaktiviert"
         from .const import HASS_ZERO_EXPORT_MANAGER
-        if DOMAIN in hass.data and HASS_ZERO_EXPORT_MANAGER in hass.data[DOMAIN]:
-            manager = hass.data[DOMAIN][HASS_ZERO_EXPORT_MANAGER]
+        manager = None
+        for entry_id, entry_data in hass.data.get(DOMAIN, {}).items():
+            if isinstance(entry_data, dict) and HASS_ZERO_EXPORT_MANAGER in entry_data:
+                manager = entry_data[HASS_ZERO_EXPORT_MANAGER]
+                break
+        
+        if manager:
             ze_status = getattr(manager, "status", "Unbekannt")
 
         import time

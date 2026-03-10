@@ -469,8 +469,8 @@ class HoymilesCYDPanel extends LitElement {
                    <div class="cfg-label">Automatisierung</div>
                    <div class="cfg-desc">Nulleinspeisung ein- oder ausschalten.</div>
                 </div>
-                <ha-switch .checked="${(this.hass.states['switch.zero_export_controller_nulleinspeisung_aktivieren'] || this.hass.states['switch.zero_export_controller_zero_export_enabled'])?.state === 'on'}"
-                  @change="${() => this._handleSwitchChange()}"></ha-switch>
+                <ha-switch .checked="${this.config.is_enabled || false}"
+                  @change="${(e) => { this.config = { ...this.config, is_enabled: e.target.checked }; this._handleSwitchChange(e.target.checked); }}"></ha-switch>
              </div>
 
              <div class="cfg-row">
@@ -690,13 +690,12 @@ class HoymilesCYDPanel extends LitElement {
 
   _toggleSwitch(entity) { this.hass.callService('switch', 'toggle', { entity_id: entity }); }
 
-  _handleSwitchChange() {
+  _handleSwitchChange(on) {
     const ids = ['switch.zero_export_controller_nulleinspeisung_aktivieren', 'switch.zero_export_controller_zero_export_enabled'];
+    const service = on ? 'turn_on' : 'turn_off';
     for (const id of ids) {
       if (this.hass.states[id]) {
-        this._toggleSwitch(id);
-        // Optimistic update for UI feel
-        const newState = this.hass.states[id].state === 'on' ? 'off' : 'on';
+        this.hass.callService('switch', service, { entity_id: id });
         this.requestUpdate();
         return;
       }
