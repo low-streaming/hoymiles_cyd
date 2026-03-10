@@ -268,7 +268,8 @@ class HoymilesCYDPanel extends LitElement {
     const battery_soc = this.hass.states[this.config.battery_soc_sensor]?.state || null;
 
     const inverter_temp = this.hass.states['sensor.hoymiles_cyd_temperature']?.state || '--';
-    const control_limit = this.hass.states['sensor.zero_export_controller_nulleinspeisung_leistungslimit']?.state || '0';
+    const zero_export_status = this.hass.states['sensor.zero_export_controller_zero_export_status']?.state || '--';
+    const control_limit = this.hass.states['sensor.zero_export_controller_zero_export_limit']?.state || '0';
 
     const house_consumption = Math.max(0, solar_p + grid_p + (batt_p > 0 ? 0 : Math.abs(batt_p)));
     const gauge_deg = (parseFloat(control_limit) / 100) * 180;
@@ -462,8 +463,8 @@ class HoymilesCYDPanel extends LitElement {
                    <div class="cfg-label">Automatisierung</div>
                    <div class="cfg-desc">Nulleinspeisung ein- oder ausschalten.</div>
                 </div>
-                <ha-switch .checked="${this.hass.states['switch.zero_export_controller_nulleinspeisung_aktivieren']?.state === 'on'}"
-                  @change="${() => this._toggleSwitch('switch.zero_export_controller_nulleinspeisung_aktivieren')}"></ha-switch>
+                <ha-switch .checked="${this.hass.states['switch.zero_export_controller_zero_export_enabled']?.state === 'on'}"
+                  @change="${() => this._toggleSwitch('switch.zero_export_controller_zero_export_enabled')}"></ha-switch>
              </div>
 
              <div class="cfg-row">
