@@ -39,6 +39,8 @@ class ZeroExportManager:
         self._is_updating = False
         self._callbacks = []
         self._config = {}
+        self._battery_empty_mode = False
+        self._unsub_batt = None
 
     def add_state_change_callback(self, callback_func):
         """Add callback for state changes."""
@@ -66,6 +68,9 @@ class ZeroExportManager:
         
         if not self._enabled:
             return "Ausgeschaltet (Schalter)"
+            
+        if getattr(self, '_battery_empty_mode', False):
+            return "Akku Leer (Schutz)"
             
         if mode == "zero_export" and not self._grid_sensor:
             return "Konf-Fehler (Zähler?)"
@@ -166,8 +171,18 @@ class ZeroExportManager:
             self._unsub()
             self._unsub = None
             
+        if self._unsub_batt:
+            self._unsub_batt()
+            self._unsub_batt = None
+            
         if not self._enabled:
             return
+            
+        batt_sensor = self._config.get("battery_soc_sensor")
+        if self._config.get("battery_protection_enabled") and batt_sensor:
+            self._unsub_batt = async_track_state_change_event(
+                self.hass, [batt_sensor], self._handle_battery_change
+            )
 
         mode = self._config.get("operation_mode", "zero_export")
         if mode == "zero_export":
@@ -201,6 +216,9 @@ class ZeroExportManager:
         if self._unsub:
             self._unsub()
             self._unsub = None
+        if self._unsub_batt:
+            self._unsub_batt()
+            self._unsub_batt = None
 
     def update_config(self, config: dict):
         """Update configuration from external source (Panel)."""
@@ -216,6 +234,20 @@ class ZeroExportManager:
         self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
         
         self._update_tracker()
+
+    async def _handle_battery_change(self, event):
+        """Handle battery SOC change to trigger limit updates."""
+        mode = self._config.get("operation_mode", "zero_export")
+        if mode == "zero_export":
+            if self._grid_sensor:
+                state = self.hass.states.get(self._grid_sensor)
+                if state:
+                    class MockEvent:
+                        def __init__(self, data):
+                            self.data = data
+                    await self._handle_grid_change(MockEvent({"new_state": state}))
+        elif mode == "base_load":
+            await self._handle_base_load_change(None)
 
     async def _handle_base_load_change(self, event):
         """Handle change in one of the base load plugs."""
@@ -318,11 +350,38 @@ class ZeroExportManager:
             # Safety: don't let desired production go below 0
             desired_production = max(0.0, desired_production)
             
+            # Batteryschutz (Battery Protection)
+            batt_sensor = self._config.get("battery_soc_sensor")
+            batt_enabled = self._config.get("battery_protection_enabled")
+            if batt_enabled and batt_sensor:
+                state = self.hass.states.get(batt_sensor)
+                if state and state.state not in ("unknown", "unavailable"):
+                    try:
+                        soc = float(state.state)
+                        min_soc = float(self._config.get("battery_min_soc", 10))
+                        restart_soc = float(self._config.get("battery_restart_soc", 15))
+                        
+                        if soc <= min_soc:
+                            if not self._battery_empty_mode:
+                                _LOGGER.info(f"Battery Protection: SOC {soc}% <= {min_soc}%. STOPPING export.")
+                            self._battery_empty_mode = True
+                        elif soc >= restart_soc:
+                            if self._battery_empty_mode:
+                                _LOGGER.info(f"Battery Protection: SOC {soc}% >= {restart_soc}%. RESUMING export.")
+                            self._battery_empty_mode = False
+                    except ValueError:
+                        pass
+            
             # New Limit % = (Desired / MaxCapacity) * 100
             new_limit = (desired_production / self._max_capacity) * 100
             
-            # Apply constraints
-            new_limit = max(float(self._min_limit), min(float(self._max_limit), new_limit))
+            # Apply constraints overrides for empty battery
+            if self._battery_empty_mode:
+                new_limit = 0.0
+                desired_production = 0.0
+            else:
+                new_limit = max(float(self._min_limit), min(float(self._max_limit), new_limit))
+                
             new_limit = round(new_limit, 1)
 
             # Avoid small jitter

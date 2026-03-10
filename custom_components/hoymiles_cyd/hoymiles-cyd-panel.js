@@ -392,7 +392,7 @@ class HoymilesCYDPanel extends LitElement {
                 <div class="g-arc" style="transform: rotate(${gauge_deg}deg)"></div>
                 <div class="g-inner">
                    <div class="g-cap">NETZBILANZ</div>
-                   <div class="g-main">${Math.abs(grid_p)}<span style="font-size: 0.4em; margin-left: 4px;">W</span></div>
+                   <div class="g-main">${Math.abs(grid_p).toFixed(0)}<span style="font-size: 0.4em; margin-left: 4px;">W</span></div>
                    <div class="g-stat ${grid_p >= 0 ? 'red' : 'green'}">
                       <ha-icon icon="${grid_p >= 0 ? 'mdi:arrow-down-bold' : 'mdi:arrow-up-bold'}"></ha-icon>
                       ${grid_p >= 0 ? 'IMPORT' : 'EXPORT'}
@@ -588,11 +588,51 @@ class HoymilesCYDPanel extends LitElement {
                 </div>
              </div>
 
-             <div class="info-box-neon">
-                <ha-icon icon="mdi:information-outline"></ha-icon>
-                <span>Die Automatik (ZEN) berechnet sekündlich das optimale Limit für deine Wechselrichter.</span>
-             </div>
-          </div>
+              <div class="info-box-neon">
+                 <ha-icon icon="mdi:information-outline"></ha-icon>
+                 <span>Die Automatik (ZEN) berechnet sekündlich das optimale Limit für deine Wechselrichter.</span>
+              </div>
+           </div>
+
+           <!-- BATTERIESCHUTZ -->
+           <div class="config-section glass">
+              <div class="section-title"><ha-icon icon="mdi:battery-shield"></ha-icon> BATTERIESCHUTZ</div>
+              
+              <div class="cfg-row" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Batterieschutz aktivieren</div>
+                    <div class="cfg-desc">Verhindert die Tiefenentladung des Akkus (Erfordert Batterie SOC Sensor).</div>
+                 </div>
+                 <ha-switch .checked="${this.config.battery_protection_enabled || false}"
+                   @change="${(e) => { this.config = { ...this.config, battery_protection_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+              </div>
+
+              ${this.config.battery_protection_enabled ? html`
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Abschalt-Limit (SOC %)</div>
+                    <div class="cfg-desc">Bei diesem Wert wird das Limit auf 0W gesetzt (Ausschalten).</div>
+                 </div>
+                 <div class="input-wrap">
+                    <input type="number" class="cfg-num" .value="${this.config.battery_min_soc || 10}"
+                      @change="${(e) => this.config = { ...this.config, battery_min_soc: e.target.value }}">
+                    <span class="unit-tag">%</span>
+                 </div>
+              </div>
+
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Einschalt-Limit (SOC %)</div>
+                    <div class="cfg-desc">Erst ab diesem Wert wird die Einspeisung wieder freigegeben.</div>
+                 </div>
+                 <div class="input-wrap">
+                    <input type="number" class="cfg-num" .value="${this.config.battery_restart_soc || 15}"
+                      @change="${(e) => this.config = { ...this.config, battery_restart_soc: e.target.value }}">
+                    <span class="unit-tag">%</span>
+                 </div>
+              </div>
+              ` : ''}
+           </div>
         </div>
 
         <!-- SENSORIK Sektion -->
