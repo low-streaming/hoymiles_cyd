@@ -426,6 +426,11 @@
         "name": "Leistung Batterie zu Netz"
       }
     },
+    "switch": {
+      "zero_export_enabled": {
+        "name": "Nulleinspeisung aktivieren"
+      }
+    },
     "button": {
       "restart": {
         "name": "Neustart"
@@ -453,11 +458,6 @@
     },
     "hybrid_inverter": {
       "name": "Hybrid-Wechselrichter"
-    }
-  },
-  "switch": {
-    "zero_export_enabled": {
-      "name": "Nulleinspeisung aktivieren"
     }
   },
   "services": {

@@ -141,7 +141,6 @@ class ZeroExportManager:
                     self.hass, [self._grid_sensor], self._handle_grid_change
                 )
 
-    @callback
     async def _handle_grid_change(self, event):
         """Handle grid sensor state change."""
         if self._is_updating:
