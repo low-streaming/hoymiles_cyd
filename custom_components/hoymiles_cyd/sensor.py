@@ -47,6 +47,7 @@ from .const import (
     HASS_DATA_COORDINATOR,
     HASS_ENERGY_STORAGE_DATA_COORDINATOR,
     HASS_ZERO_EXPORT_MANAGER,
+    CONF_ZERO_EXPORT_TARGET,
 )
 from .entity import (
     HoymilesCoordinatorEntity,
