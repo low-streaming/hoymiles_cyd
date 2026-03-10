@@ -28,8 +28,8 @@ class ZeroExportManager:
         """Initialize the manager."""
         self.hass = hass
         self.entry = entry
-        self._enabled = False
-        self._grid_sensor = None
+        self._enabled = entry.options.get(CONF_ZERO_EXPORT_ENABLED, False)
+        self._grid_sensor = entry.options.get(CONF_GRID_SENSOR)
         self._target_watt = 0.0
         self._min_limit = 10.0
         self._max_limit = 100.0
@@ -38,6 +38,11 @@ class ZeroExportManager:
         self._last_limit = None
         self._is_updating = False
         self._config = {}
+        self._on_state_change = None
+
+    def set_on_state_change(self, callback_func):
+        """Set callback for state changes."""
+        self._on_state_change = callback_func
 
     @property
     def status(self) -> str:
@@ -72,15 +77,37 @@ class ZeroExportManager:
         """Enable or disable logic."""
         if value == self._enabled:
             return
+        
+        _LOGGER.info(f"Zero Export Manager: Changing enabled state to {value}")
         self._enabled = value
         if value:
             if not self._unsub and self._grid_sensor:
-                _LOGGER.info(f"Enabling Zero Export for {self._grid_sensor}")
+                _LOGGER.info(f"Enabling track for {self._grid_sensor}")
                 self._unsub = async_track_state_change_event(
                     self.hass, [self._grid_sensor], self._handle_grid_change
                 )
         else:
             self.stop()
+            
+        if self._on_state_change:
+            self._on_state_change()
+            
+        # Save state to persistent JSON
+        self.hass.async_create_task(self.async_save_config())
+
+    async def async_save_config(self):
+        """Save current config to JSON."""
+        json_path = self.hass.config.path("hoymiles_cyd_config.json")
+        self._config["is_enabled"] = self._enabled
+        
+        def save():
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(self._config, f, indent=2)
+        
+        try:
+            await self.hass.async_add_executor_job(save)
+        except Exception as e:
+            _LOGGER.error(f"Failed to save zero export config: {e}")
 
     @property
     def target_power(self) -> float:
@@ -116,6 +143,7 @@ class ZeroExportManager:
         config = await self.hass.async_add_executor_job(load_json)
         if config:
             self._config = config
+            self._enabled = config.get("is_enabled", self._enabled)
             self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
             self._target_watt = float(config.get("target_grid_watt", self._target_watt))
 

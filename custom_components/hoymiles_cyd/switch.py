@@ -57,17 +57,9 @@ class HoymilesZeroExportSwitch(SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         self._manager.is_enabled = True
-        # Update entry options
-        new_options = dict(self._entry.options)
-        new_options[CONF_ZERO_EXPORT_ENABLED] = True
-        self.hass.config_entries.async_update_entry(self._entry, options=new_options)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         self._manager.is_enabled = False
-        # Update entry options
-        new_options = dict(self._entry.options)
-        new_options[CONF_ZERO_EXPORT_ENABLED] = False
-        self.hass.config_entries.async_update_entry(self._entry, options=new_options)
         self.async_write_ha_state()

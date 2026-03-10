@@ -1836,6 +1836,10 @@ class HoymilesZeroExportSensor(SensorEntity):
             "model": "Logic Module",
         }
 
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks."""
+        self._manager.set_on_state_change(self.async_write_ha_state)
+
     @property
     def native_value(self):
         """Return status."""
