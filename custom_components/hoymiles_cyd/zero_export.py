@@ -182,7 +182,7 @@ class ZeroExportManager:
             # Get current production (W)
             current_production = 0
             # Try to get it from the coordinator's data directly
-            if coordinator.data:
+            if coordinator and hasattr(coordinator, "data") and coordinator.data:
                 # Assuming the coordinator data has a total_ac_power attribute or similar
                 # If it's a list or dict, we need to adapt
                 if hasattr(coordinator.data, 'total_ac_power'):

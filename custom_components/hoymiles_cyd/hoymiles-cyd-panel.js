@@ -627,22 +627,61 @@ class HoymilesCYDPanel extends LitElement {
   renderHelp() {
     return html`
       <div class="help-page glass animate-fade-in">
+      <div class="help-content animate-fade-in glass">
         <div class="help-header">
-           <ha-icon icon="mdi:help-circle"></ha-icon>
-           <h3>DASHBOARD HILFE</h3>
+           <ha-icon icon="mdi:book-open-variant"></ha-icon>
+           <h3>HOYMILES CYD - BEDIENUNGSANLEITUNG</h3>
         </div>
-        <p>Willkommen bei der Hoymiles CYD Steuerung. Hier ist eine Kurzanleitung:</p>
-        <ul class="help-list">
-          <li><strong>Dashboard:</strong> Echtzeit-Überwachung deiner Solaranlage und Nulleinspeisung.</li>
-          <li><strong>Einstellungen:</strong> Verknüpfe hier deine Home Assistant Sensoren für die korrekre Darstellung.</li>
-          <li><strong>Nulleinspeisung:</strong> Das System regelt den Wechselrichter automatisch, um den Netzbezug auf dem Zielwert zu halten.</li>
-        </ul>
-        <div class="help-footer">Entwickelt für Hoymiles CYD Integration.</div>
+        
+        <div class="help-grid">
+          <div class="help-section">
+            <h4><ha-icon icon="mdi:rocket-launch"></ha-icon> 1. ERSTE SCHRITTE</h4>
+            <p>Um die Nulleinspeisung (ZEN) zu nutzen, musst du zuerst deine Hardware definieren:</p>
+            <ul>
+              <li><strong>Hoymiles DTU:</strong> Direkte Steuerung über die offizielle DTU.</li>
+              <li><strong>OpenDTU / AhoyDTU:</strong> Steuerung über MQTT-Entities (typischerweise ein <code>number</code>-Sensor für das Limit).</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h4><ha-icon icon="mdi:tune"></ha-icon> 2. SENSOR-MAPPING</h4>
+            <p>Damit die Logik weiß, wie viel Strom gerade verbraucht wird, verknüpfe unter <strong>EINSTELLUNGEN</strong>:</p>
+            <ul>
+              <li><strong>Stromzähler:</strong> Dein Hauptzähler (Watt). Positive Werte = Bezug, Negative = Einspeisung.</li>
+              <li><strong>Solar Leistung:</strong> Die aktuelle Erzeugung deiner Wechselrichter.</li>
+              <li><strong>Skalierung:</strong> Falls deine Sensoren kW statt W liefern, nutze den integrierten Konverter.</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h4><ha-icon icon="mdi:brain"></ha-icon> 3. DIE ZEN-AUTOMATIK</h4>
+            <p>Der <strong>Zero Export Network (ZEN)</strong> Algorithmus berechnet jede Sekunde das optimale Limit:</p>
+            <ul>
+              <li><strong>Ziel-Bezug:</strong> Ein kleiner Puffer (z.B. 10W) verhindert, dass Regelverzögerungen zur ungewollten Einspeisung führen.</li>
+              <li><strong>Max. Kapazität:</strong> Gib hier die maximale AC-Leistung deiner Inverter an (z.B. 800W).</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h4><ha-icon icon="mdi:alert-circle-outline"></ha-icon> 4. FEHLERBEHEBUNG</h4>
+            <p>Solltest du Probleme haben:</p>
+            <ul>
+              <li><strong>Schalter reagiert nicht:</strong> Seite neu laden (Browser-Cache).</li>
+              <li><strong>Limit wird nicht gesetzt:</strong> Prüfe, ob die "External Limit Entity" korrekt beschreibbar ist.</li>
+              <li><strong>Falsche Werte:</strong> Kontrolliere die Einheiten (Watt vs. Prozent).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-footer">
+          <div class="footer-line"></div>
+          <p>Entwickelt von <strong>Hoymiles CYD Team</strong> | AGPL-3.0 Lizenz</p>
+        </div>
       </div>
     `;
   }
 
-  _toggleSwitch(entity) { this.hass.callService('switch', 'turn_toggle', { entity_id: entity }); }
+  _toggleSwitch(entity) { this.hass.callService('switch', 'toggle', { entity_id: entity }); }
   _setNumber(entity, value) { this.hass.callService('number', 'set_value', { entity_id: entity, value: value }); }
 
   static get styles() {
@@ -721,7 +760,11 @@ class HoymilesCYDPanel extends LitElement {
       .animate-fade-in { animation: fadeIn 0.8s ease-out forwards; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-      .panel-container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+      .panel-container { max-width: 1400px; margin: 0 auto; padding: 30px; transition: padding 0.3s; }
+
+      @media (max-width: 768px) {
+        .panel-container { padding: 15px; }
+      }
 
       /* --- HEADER --- */
       .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
@@ -741,12 +784,18 @@ class HoymilesCYDPanel extends LitElement {
       .version-tag::before { content: ''; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: inline-block; box-shadow: 0 0 10px var(--accent); }
       .time-area { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: var(--text-dim); background: rgba(255,255,255,0.03); padding: 8px 16px; border-radius: 12px; border: 1px solid var(--glass-border); }
 
+      @media (max-width: 600px) {
+        .header { flex-direction: column; align-items: flex-start; gap: 20px; }
+        .time-area { width: 100%; text-align: center; }
+        .logo-text h1 { font-size: 1.2em; }
+      }
+
       /* --- TABS --- */
-      .tabs { display: flex; gap: 15px; margin-bottom: 40px; }
+      .tabs { display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
       .tab { 
-        padding: 14px 32px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); 
-        border-radius: 14px; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); 
-        color: var(--text-dim); letter-spacing: 1px;
+        padding: 10px 24px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); 
+        border-radius: 12px; cursor: pointer; font-size: 0.8em; font-weight: 600; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); 
+        color: var(--text-dim); letter-spacing: 1px; flex: 1; text-align: center; min-width: 100px;
       }
       .tab:hover { background: rgba(255,255,255,0.05); color: #fff; transform: translateY(-2px); }
       .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 10px 30px var(--accent-glow); }
@@ -777,7 +826,7 @@ class HoymilesCYDPanel extends LitElement {
       .orange { color: var(--accent); filter: drop-shadow(0 0 12px var(--accent-glow)); }
 
       /* --- POWER CORE ENGINE --- */
-      .engine { position: relative; width: 600px; height: 420px; margin: 0 auto; }
+      .engine { position: relative; width: 100%; max-width: 600px; height: auto; aspect-ratio: 600/420; margin: 0 auto; overflow: visible; }
       .engine-svg { position: absolute; width: 100%; height: 100%; filter: drop-shadow(0 0 8px rgba(0,0,0,0.5)); }
       .pth { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 5; stroke-linecap: round; }
       .pth-active { stroke: var(--accent); stroke-width: 6; stroke-dasharray: 10 15; opacity: 0.3; filter: blur(2px); animation: flow-dash 1s linear infinite; }
@@ -805,7 +854,7 @@ class HoymilesCYDPanel extends LitElement {
       .gauge-center { 
         position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
         display: flex; flex-direction: column; align-items: center; justify-content: center; 
-        width: 280px; height: 280px; z-index: 5;
+        width: 45%; height: auto; aspect-ratio: 1/1; z-index: 5;
       }
       .g-ring { position: absolute; width: 100%; height: 100%; border: 16px solid rgba(255,255,255,0.02); border-radius: 50%; }
       .g-arc { 
@@ -813,10 +862,10 @@ class HoymilesCYDPanel extends LitElement {
         border-top-color: var(--accent); border-radius: 50%; 
         filter: drop-shadow(0 0 15px var(--accent)); transition: 1.5s cubic-bezier(0.4, 0, 0.2, 1); 
       }
-      .g-inner { text-align: center; z-index: 10; background: radial-gradient(circle, rgba(20,20,25,0.95) 0%, transparent 70%); width: 200px; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; }
-      .g-cap { font-size: 0.75em; color: var(--text-dim); font-weight: 700; margin-bottom: 5px; letter-spacing: 1px; }
-      .g-main { font-size: 3.4em; font-weight: 800; color: #fff; font-family: 'JetBrains Mono', monospace; line-height: 1; letter-spacing: -2px; }
-      .g-stat { font-size: 0.9em; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.03); }
+      .g-inner { text-align: center; z-index: 10; background: radial-gradient(circle, rgba(20,20,25,0.95) 0%, transparent 80%); width: 85%; height: 85%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; }
+      .g-cap { font-size: min(0.75em, 3vw); color: var(--text-dim); font-weight: 700; margin-bottom: 5px; letter-spacing: 1px; }
+      .g-main { font-size: min(3.4em, 12vw); font-weight: 800; color: #fff; font-family: 'JetBrains Mono', monospace; line-height: 1; letter-spacing: -2px; }
+      .g-stat { font-size: min(0.9em, 4vw); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.03); }
 
       /* --- GRAPH --- */
       .graph-area { margin-top: 60px; background: rgba(0,0,0,0.15); padding: 25px; border-radius: 24px; border: 1px solid var(--glass-border); }
@@ -858,8 +907,14 @@ class HoymilesCYDPanel extends LitElement {
       .setup-title { font-size: 1.8em; font-weight: 900; letter-spacing: 2px; color: #fff; }
       .setup-step { font-size: 1em; color: var(--text-dim); margin-top: 5px; }
 
-      .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+      .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; margin-bottom: 30px; }
+      @media (max-width: 900px) {
+        .config-grid { grid-template-columns: 1fr; }
+      }
       .config-section { padding: 40px; position: relative; }
+      @media (max-width: 600px) {
+        .config-section { padding: 25px; }
+      }
       .section-title { color: var(--accent); font-weight: 800; margin-bottom: 30px; font-size: 1.25em; letter-spacing: 1px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; }
       .section-lead { color: var(--text-dim); margin-bottom: 35px; font-size: 1.1em; line-height: 1.6; }
 
@@ -913,9 +968,33 @@ class HoymilesCYDPanel extends LitElement {
       .green { color: #2ecc71 !important; }
       .red { color: #e74c3c !important; }
 
+      /* HELP STYLES */
+      .help-content { padding: 50px; }
+      .help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
+      @media (max-width: 900px) {
+        .help-grid { grid-template-columns: 1fr; }
+        .help-content { padding: 30px; }
+      }
+      .help-section h4 { color: #fff; font-weight: 800; margin-bottom: 15px; display: flex; align-items: center; gap: 12px; letter-spacing: 1px; }
+      .help-section ha-icon { color: var(--accent); }
+      .help-section p { color: var(--text-dim); line-height: 1.6; font-size: 0.95em; }
+      .help-section ul { padding-left: 20px; color: var(--text-dim); }
+      .help-section li { margin-bottom: 10px; font-size: 0.9em; }
+      .help-footer { margin-top: 60px; text-align: center; }
+      .footer-line { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-border), transparent); margin-bottom: 20px; }
+      .help-footer p { font-size: 0.8em; color: var(--text-dim); }
+
       @media (max-width: 1200px) {
         .dashboard-layout { grid-template-columns: 1fr; }
         .sidebar { order: 2; }
+      }
+      
+      @media (max-width: 600px) {
+        .main-card { padding: 25px; }
+        .labels-top .val { font-size: 1.8em; }
+        .labels-top .box { padding: 10px 15px; }
+        .node { width: 50px; height: 50px; font-size: 1.25em; border-radius: 12px; }
+        .pth-active { stroke-width: 4; }
       }
     `;
   }
