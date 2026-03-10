@@ -45,10 +45,16 @@ class ZeroExportManager:
         mode = self._config.get("operation_mode", "zero_export")
         if mode == "disabled":
             return "Inaktiv"
+        
         if not self._enabled:
-            return "Deaktiviert (Switch)"
+            return "Ausgeschaltet (Schalter)"
+            
         if not self._grid_sensor:
-            return "Konfigurationsfehler"
+            return "Konf-Fehler (Sensor?)"
+            
+        if self._last_limit is None:
+            return "Warte auf Messwerte"
+            
         return "Läuft (ZEN)" if mode == "zero_export" else "Manuell"
 
     @property
