@@ -675,7 +675,7 @@ class HoymilesCYDPanel extends LitElement {
 
         <div class="help-footer">
           <div class="footer-line"></div>
-          <p>Entwickelt von <strong>Hoymiles CYD Team</strong> | AGPL-3.0 Lizenz</p>
+          <p><strong>Low Streaming by OpenKairo</strong> | AGPL-3.0 Lizenz</p>
         </div>
       </div>
     `;
