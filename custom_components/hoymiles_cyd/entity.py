@@ -16,7 +16,7 @@ from hoymiles_wifi.hoymiles import (
     get_meter_model_name,
 )
 
-from .const import CONF_DTU_SERIAL_NUMBER, DOMAIN
+from .const import CONF_DTU_SERIAL_NUMBER, DOMAIN, CONF_USE_GENERIC
 from .coordinator import (
     HoymilesDataUpdateCoordinator,
 )
@@ -63,17 +63,23 @@ class HoymilesEntity(Entity):
             self._attr_translation_placeholders = {"phase": f"{description.phase}"}
 
         dtu_serial_number = config_entry.data[CONF_DTU_SERIAL_NUMBER]
-
+        use_generic = config_entry.data.get(CONF_USE_GENERIC, False)
         serial_number = str(self.entity_description.serial_number)
 
         if self.entity_description.is_dtu_sensor is True:
             device_translation_key = "dtu"
-            device_model = get_dtu_model_name(self.entity_description.serial_number)
+            if use_generic:
+                device_model = "Generic DTU"
+            else:
+                device_model = get_dtu_model_name(self.entity_description.serial_number)
         else:
             if "meter" in self.entity_description.key:
-                device_model = get_meter_model_name(
-                    self.entity_description.serial_number
-                )
+                if use_generic:
+                    device_model = "Generic Meter"
+                else:
+                    device_model = get_meter_model_name(
+                        self.entity_description.serial_number
+                    )
                 device_translation_key = "meter"
             else:
                 if (
@@ -83,9 +89,12 @@ class HoymilesEntity(Entity):
                     device_model = self.entity_description.model_name
                     device_translation_key = "hybrid_inverter"
                 else:
-                    device_model = get_inverter_model_name(
-                        self.entity_description.serial_number
-                    )
+                    if use_generic:
+                        device_model = "Generic Inverter"
+                    else:
+                        device_model = get_inverter_model_name(
+                            self.entity_description.serial_number
+                        )
                     device_translation_key = "inverter"
 
         device_info = DeviceInfo(

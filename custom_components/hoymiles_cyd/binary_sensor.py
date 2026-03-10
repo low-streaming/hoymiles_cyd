@@ -53,7 +53,7 @@ async def async_setup_entry(
     hass_data = hass.data[DOMAIN][config_entry.entry_id]
     coordinator = hass_data.get(HASS_DATA_COORDINATOR, None)
     if coordinator is None:
-        coordinator = hass_data.get(HASS_ENERGY_STORAGE_DATA_COORDINATOR, None)
+        return
 
     dtu_serial_number = config_entry.data[CONF_DTU_SERIAL_NUMBER]
 
