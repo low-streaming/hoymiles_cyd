@@ -37,12 +37,24 @@ class ZeroExportManager:
         self._unsub = None
         self._last_limit = None
         self._is_updating = False
-        self._config = {}
-        self._on_state_change = None
+        self._callbacks = []
 
+    def add_state_change_callback(self, callback_func):
+        """Add callback for state changes."""
+        if callback_func not in self._callbacks:
+            self._callbacks.append(callback_func)
+            
     def set_on_state_change(self, callback_func):
-        """Set callback for state changes."""
-        self._on_state_change = callback_func
+        """Deprecated: Use add_state_change_callback."""
+        self.add_state_change_callback(callback_func)
+
+    def _trigger_callbacks(self):
+        """Trigger all registered state change callbacks."""
+        for callback_func in self._callbacks:
+            try:
+                callback_func()
+            except Exception as e:
+                _LOGGER.error(f"Error in Zero Export state callback: {e}")
 
     @property
     def status(self) -> str:
@@ -87,8 +99,7 @@ class ZeroExportManager:
         if not value:
             self.stop()
             
-        if self._on_state_change:
-            self._on_state_change()
+        self._trigger_callbacks()
             
         # Save state to persistent JSON
         self.hass.async_create_task(self.async_save_config())
@@ -175,8 +186,11 @@ class ZeroExportManager:
                 self._unsub = async_track_state_change_event(
                     self.hass, plugs, self._handle_base_load_change
                 )
-                # Trigger initial update
-                self.hass.async_create_task(self._handle_base_load_change(None))
+            else:
+                _LOGGER.info("Zero Export: Base load mode active with static load only (no plugs)")
+                
+            # Trigger initial update always
+            self.hass.async_create_task(self._handle_base_load_change(None))
         elif mode == "manual_limit":
              # Manual mode might not need trackers, but we could track a number entity
              pass
@@ -349,8 +363,7 @@ class ZeroExportManager:
                     )
                 
                 self._last_limit = new_limit
-                if self._on_state_change:
-                    self._on_state_change()
+                self._trigger_callbacks()
                 
         except Exception as err:
             _LOGGER.error(f"Error in Zero Export adjustment: {err}")

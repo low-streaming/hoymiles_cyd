@@ -1876,6 +1876,10 @@ class HoymilesZeroExportLimitSensor(SensorEntity):
             "model": "Logic Module",
         }
 
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks."""
+        self._manager.add_state_change_callback(self.async_write_ha_state)
+
     @property
     def native_value(self):
         """Return limit."""
