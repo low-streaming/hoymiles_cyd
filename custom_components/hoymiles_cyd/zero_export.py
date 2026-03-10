@@ -206,6 +206,12 @@ class ZeroExportManager:
             return
             
         total_load = 0.0
+        # Add static base load
+        try:
+            total_load += float(self._config.get("static_base_load", 0))
+        except ValueError:
+            pass
+
         for i in range(1, 7):
             plug = self._config.get(f"base_plug_{i}")
             if plug:

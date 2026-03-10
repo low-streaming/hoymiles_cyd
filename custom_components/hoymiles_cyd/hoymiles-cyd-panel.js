@@ -64,7 +64,10 @@ class HoymilesEntityPicker extends LitElement {
         <label>${this.label}</label>
         <div class="input-box" @click="${(e) => { e.stopPropagation(); this.open = !this.open; }}">
           <span>${this.value ? selectedName.split(' (')[0] : html`<span class="placeholder">Entität suchen...</span>`}</span>
-          <ha-icon icon="${this.open ? 'mdi:chevron-up' : 'mdi:chevron-down'}"></ha-icon>
+          <div class="picker-icons">
+            ${this.value ? html`<ha-icon icon="mdi:close-circle" @click="${(e) => { e.stopPropagation(); this._selectItem(''); }}"></ha-icon>` : ''}
+            <ha-icon icon="${this.open ? 'mdi:chevron-up' : 'mdi:chevron-down'}"></ha-icon>
+          </div>
         </div>
         
         ${this.open ? html`
@@ -89,7 +92,8 @@ class HoymilesEntityPicker extends LitElement {
 
   static get styles() {
     return css`
-      :host { display: block; margin-bottom: 20px; }
+      :host { display: block; margin-bottom: 20px; position: relative; z-index: 1; }
+      :host([open]) { z-index: 9999; }
       .picker-wrapper { position: relative; }
       label { display: block; font-size: 0.75em; color: #888; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; }
       .input-box { 
@@ -104,10 +108,13 @@ class HoymilesEntityPicker extends LitElement {
         transition: 0.3s;
         color: #fff;
       }
+      .picker-icons { display: flex; align-items: center; gap: 8px; }
+      .picker-icons ha-icon { --mdc-icon-size: 18px; color: #888; }
+      .picker-icons ha-icon:hover { color: #F7931A; }
       .input-box:hover { border-color: #F7931A; background: rgba(30,30,35,0.9); }
       .placeholder { color: #444; }
       .dropdown { 
-        position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; 
+        position: absolute; top: 100%; left: 0; right: 0; z-index: 9999; 
         margin-top: 5px; max-height: 300px; display: flex; flex-direction: column;
         border: 1px solid #F7931A; border-radius: 10px; overflow: hidden;
       }
@@ -628,6 +635,18 @@ class HoymilesCYDPanel extends LitElement {
            <div class="section-title"><ha-icon icon="mdi:power-plug"></ha-icon> GRUNDLAST PLUGS</div>
            <p class="section-lead">Diese Sensoren werden summiert, wenn 'Grundlast' als Betriebsmodus gewählt ist.</p>
            
+           <div class="cfg-row" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+              <div class="cfg-info">
+                 <div class="cfg-label">Statische Grundlast</div>
+                 <div class="cfg-desc">Fester Watt-Wert, der immer addiert wird.</div>
+              </div>
+              <div class="input-wrap">
+                 <input type="number" class="cfg-num" .value="${this.config.static_base_load || 0}"
+                   @change="${(e) => this.config = { ...this.config, static_base_load: e.target.value }}">
+                 <span class="unit-tag">W</span>
+              </div>
+           </div>
+
            <div class="picker-grid">
               ${[1, 2, 3, 4, 5, 6].map(i => html`
                 <div class="p-card min-card">
