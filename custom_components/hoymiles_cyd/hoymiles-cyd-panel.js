@@ -12,7 +12,8 @@ class HoymilesEntityPicker extends LitElement {
       label: { type: String },
       value: { type: String },
       open: { type: Boolean },
-      search: { type: String }
+      search: { type: String },
+      domain: { type: String }
     };
   }
 
@@ -20,12 +21,14 @@ class HoymilesEntityPicker extends LitElement {
     super();
     this.open = false;
     this.search = '';
+    this.domain = 'sensor';
   }
 
   get entities() {
     if (!this.hass) return [];
+    const domains = this.domain.split(',');
     return Object.keys(this.hass.states)
-      .filter(id => id.startsWith('sensor.'))
+      .filter(id => domains.some(d => id.startsWith(d + '.')))
       .map(id => ({
         id,
         name: this.hass.states[id].attributes.friendly_name || id
@@ -76,7 +79,7 @@ class HoymilesEntityPicker extends LitElement {
                   <div class="name">${ent.name.split(' (')[0]}</div>
                   <div class="id">${ent.id}</div>
                 </div>
-              `) : html`<div class="empty">Keine Sensoren gefunden</div>`}
+              `) : html`<div class="empty">Keine Entitäten gefunden (${this.domain})</div>`}
             </div>
           </div>
         ` : ''}
@@ -506,7 +509,7 @@ class HoymilesCYDPanel extends LitElement {
                    <div class="cfg-info">
                       <div class="cfg-label">External Limit Entity</div>
                    </div>
-                   <hoymiles-entity-picker .hass="${this.hass}" label="Number / Limit Entity" .value="${this.config.external_limit_entity}"
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Number / Limit Entity" .value="${this.config.external_limit_entity}" domain="number,input_number"
                      @value-changed="${(e) => this.config = { ...this.config, external_limit_entity: e.detail.value }}"></hoymiles-entity-picker>
                 </div>
                 <div class="cfg-row">
