@@ -385,6 +385,7 @@ class HoymilesCYDPanel extends LitElement {
               <div class="node n-batt neon-border-green" style="bottom: 68px; right: 88px;">
                 <ha-icon icon="mdi:battery-high"></ha-icon>
                 ${battery_soc ? html`<div class="soc-tag neon-bg-green">${battery_soc}%</div>` : ''}
+                ${this.config.battery_power_sensor ? html`<div class="power-tag neon-bg-green">${batt_p > 0 ? '+' : ''}${batt_p.toFixed(0)}W</div>` : ''}
               </div>
 
               <div class="gauge-center">
@@ -989,6 +990,11 @@ class HoymilesCYDPanel extends LitElement {
       .soc-tag { 
         position: absolute; top: -14px; right: -14px; background: #2ecc71; color: #000; 
         font-size: 0.75em; font-weight: 800; padding: 4px 10px; border-radius: 12px; 
+        box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
+      }
+      .power-tag { 
+        position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%); background: #2ecc71; color: #000; 
+        font-size: 0.70em; font-weight: 800; padding: 3px 8px; border-radius: 10px; white-space: nowrap;
         box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
       }
 
