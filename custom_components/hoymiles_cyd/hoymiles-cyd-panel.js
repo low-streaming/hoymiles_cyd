@@ -294,6 +294,14 @@ class HoymilesCYDPanel extends LitElement {
       house_consumption = Math.max(0, solar_p + grid_p + (batt_p > 0 ? 0 : Math.abs(batt_p)));
     }
 
+    // Energy (kWh)
+    const yield_today = getScaled(this.config.solar_energy_yield_sensor || 'sensor.hoymiles_cyd_today_yield', this.config.solar_yield_scale);
+    const import_today = getScaled(this.config.grid_energy_import_sensor, this.config.grid_import_scale);
+    const export_today = getScaled(this.config.grid_energy_export_sensor, this.config.grid_export_scale);
+    const battery_soc = this.hass.states[this.config.battery_soc_sensor]?.state || null;
+
+    const inverter_temp = (this.hass.states['sensor.hoymiles_cyd_wechselrichtertemperatur'] || this.hass.states['sensor.hoymiles_cyd_temperature'])?.state || '--';
+
     const zero_export_status = (this.hass.states['sensor.zero_export_controller_nulleinspeisung_status'] || this.hass.states['sensor.zero_export_controller_zero_export_status'])?.state || '--';
     const control_limit = (this.hass.states['sensor.zero_export_controller_nulleinspeisung_leistungslimit'] || this.hass.states['sensor.zero_export_controller_zero_export_limit'])?.state || '0';
 
