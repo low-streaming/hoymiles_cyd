@@ -216,6 +216,9 @@ class HoymilesCYDPanel extends LitElement {
   }
 
   render() {
+    const zero_export_status = (this.hass.states['sensor.zero_export_controller_nulleinspeisung_status'] ||
+      this.hass.states['sensor.zero_export_controller_zero_export_status'])?.state || '--';
+
     return html`
       <div class="panel-container">
         <div class="header">
