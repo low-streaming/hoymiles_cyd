@@ -270,21 +270,33 @@ class HoymilesCYDPanel extends LitElement {
     };
 
     // Current Power (Watts)
-    const grid_p = getScaled(this.config.grid_sensor, this.config.grid_power_scale);
     const solar_p = getScaled(this.config.solar_power_sensor || 'sensor.hoymiles_cyd_ac_power', this.config.solar_power_scale);
     const batt_p = getScaled(this.config.battery_power_sensor, this.config.battery_power_scale);
 
-    // Energy (kWh)
-    const yield_today = getScaled(this.config.solar_energy_yield_sensor || 'sensor.hoymiles_cyd_today_yield', this.config.solar_yield_scale);
-    const import_today = getScaled(this.config.grid_energy_import_sensor, this.config.grid_import_scale);
-    const export_today = getScaled(this.config.grid_energy_export_sensor, this.config.grid_export_scale);
-    const battery_soc = this.hass.states[this.config.battery_soc_sensor]?.state || null;
+    let grid_p = 0;
+    let house_consumption = 0;
 
-    const inverter_temp = (this.hass.states['sensor.hoymiles_cyd_wechselrichtertemperatur'] || this.hass.states['sensor.hoymiles_cyd_temperature'])?.state || '--';
+    if (this.config.operation_mode === 'base_load') {
+      let bl_power = parseFloat(this.config.static_base_load) || 0;
+      for (let i = 1; i <= 6; i++) {
+        const p = this.config[`base_plug_${i}`];
+        if (p) {
+          const s = this.hass.states[p];
+          if (s && s.state !== 'unavailable' && s.state !== 'unknown') {
+            bl_power += parseFloat(s.state) || 0;
+          }
+        }
+      }
+      house_consumption = bl_power;
+      grid_p = house_consumption - solar_p; // Simulate grid exchange based on base load calculation
+    } else {
+      grid_p = getScaled(this.config.grid_sensor, this.config.grid_power_scale);
+      house_consumption = Math.max(0, solar_p + grid_p + (batt_p > 0 ? 0 : Math.abs(batt_p)));
+    }
+
     const zero_export_status = (this.hass.states['sensor.zero_export_controller_nulleinspeisung_status'] || this.hass.states['sensor.zero_export_controller_zero_export_status'])?.state || '--';
     const control_limit = (this.hass.states['sensor.zero_export_controller_nulleinspeisung_leistungslimit'] || this.hass.states['sensor.zero_export_controller_zero_export_limit'])?.state || '0';
 
-    const house_consumption = Math.max(0, solar_p + grid_p + (batt_p > 0 ? 0 : Math.abs(batt_p)));
     const gauge_deg = (parseFloat(control_limit) / 100) * 180;
 
     return html`

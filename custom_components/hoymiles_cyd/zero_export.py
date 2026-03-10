@@ -38,6 +38,7 @@ class ZeroExportManager:
         self._last_limit = None
         self._is_updating = False
         self._callbacks = []
+        self._config = {}
 
     def add_state_change_callback(self, callback_func):
         """Add callback for state changes."""
