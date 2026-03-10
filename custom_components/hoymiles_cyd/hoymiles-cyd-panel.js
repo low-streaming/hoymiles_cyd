@@ -1029,8 +1029,9 @@ class HoymilesCYDPanel extends LitElement {
 
       /* SENSOR CARDS */
       .picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-      .p-card { background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; transition: 0.3s; }
+      .p-card { background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; transition: 0.3s; position: relative; z-index: 1; }
       .p-card:hover { background: rgba(255,255,255,0.04); border-color: var(--accent); }
+      .p-card:focus-within { z-index: 999; }
       .p-head { font-size: 0.9em; font-weight: 800; margin-bottom: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
       .u-sel { margin-top: 15px; }
       .u-sel select { width: 100%; background: #000; color: var(--text-dim); border: 1px solid var(--glass-border); padding: 8px; border-radius: 10px; outline: none; font-size: 0.8em; }

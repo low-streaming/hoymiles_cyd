@@ -224,8 +224,10 @@ class ZeroExportManager:
         total_load = 0.0
         # Add static base load
         try:
-            total_load += float(self._config.get("static_base_load", 0))
-        except ValueError:
+            val = self._config.get("static_base_load")
+            if val:
+                total_load += float(val)
+        except (ValueError, TypeError):
             pass
 
         for i in range(1, 7):
@@ -238,8 +240,10 @@ class ZeroExportManager:
                     except ValueError:
                         pass
         
+        
         # Production should match base load + offset
         desired_production = total_load + self._target_watt
+        _LOGGER.debug(f"Zero Export (Base Load): Static + Plugs = {total_load}W, Target Offset = {self._target_watt}W, Desired = {desired_production}W")
         await self._apply_production_limit(desired_production)
 
     async def _handle_grid_change(self, event):
