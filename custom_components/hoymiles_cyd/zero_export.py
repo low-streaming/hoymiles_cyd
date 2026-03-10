@@ -54,8 +54,8 @@ class ZeroExportManager:
         if not self._enabled:
             return "Ausgeschaltet (Schalter)"
             
-        if not self._grid_sensor:
-            return "Konf-Fehler (Sensor?)"
+        if mode == "zero_export" and not self._grid_sensor:
+            return "Konf-Fehler (Zähler?)"
             
         if self._last_limit is None:
             return "Warte auf Messwerte"
@@ -175,6 +175,8 @@ class ZeroExportManager:
                 self._unsub = async_track_state_change_event(
                     self.hass, plugs, self._handle_base_load_change
                 )
+                # Trigger initial update
+                self.hass.async_create_task(self._handle_base_load_change(None))
         elif mode == "manual_limit":
              # Manual mode might not need trackers, but we could track a number entity
              pass
