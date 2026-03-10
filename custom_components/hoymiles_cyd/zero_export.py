@@ -60,6 +60,9 @@ class ZeroExportManager:
         if self._last_limit is None:
             return "Warte auf Messwerte"
             
+        if mode == "base_load":
+            return "Läuft (Grundlast)"
+            
         return "Läuft (ZEN)" if mode == "zero_export" else "Manuell"
 
     @property
@@ -80,13 +83,8 @@ class ZeroExportManager:
         
         _LOGGER.info(f"Zero Export Manager: Changing enabled state to {value}")
         self._enabled = value
-        if value:
-            if not self._unsub and self._grid_sensor:
-                _LOGGER.info(f"Enabling track for {self._grid_sensor}")
-                self._unsub = async_track_state_change_event(
-                    self.hass, [self._grid_sensor], self._handle_grid_change
-                )
-        else:
+        self._update_tracker()
+        if not value:
             self.stop()
             
         if self._on_state_change:
@@ -146,12 +144,40 @@ class ZeroExportManager:
             self._enabled = config.get("is_enabled", self._enabled)
             self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
             self._target_watt = float(config.get("target_grid_watt", self._target_watt))
+            self._max_capacity = float(config.get("max_capacity", self._max_capacity))
 
-        if self._enabled and self._grid_sensor:
-            _LOGGER.info(f"Setting up Zero Export for {self._grid_sensor} (Target: {self._target_watt}W)")
-            self._unsub = async_track_state_change_event(
-                self.hass, [self._grid_sensor], self._handle_grid_change
-            )
+        self._update_tracker()
+
+    def _update_tracker(self):
+        """Update sensor trackers based on mode and state."""
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
+            
+        if not self._enabled:
+            return
+
+        mode = self._config.get("operation_mode", "zero_export")
+        if mode == "zero_export":
+            if self._grid_sensor:
+                _LOGGER.info(f"Zero Export: Tracking grid sensor {self._grid_sensor}")
+                self._unsub = async_track_state_change_event(
+                    self.hass, [self._grid_sensor], self._handle_grid_change
+                )
+        elif mode == "base_load":
+            plugs = []
+            for i in range(1, 7):
+                plug = self._config.get(f"base_plug_{i}")
+                if plug:
+                    plugs.append(plug)
+            if plugs:
+                _LOGGER.info(f"Zero Export: Tracking {len(plugs)} plugs for base load")
+                self._unsub = async_track_state_change_event(
+                    self.hass, plugs, self._handle_base_load_change
+                )
+        elif mode == "manual_limit":
+             # Manual mode might not need trackers, but we could track a number entity
+             pass
 
     def stop(self):
         """Stop the zero export logic."""
@@ -168,22 +194,31 @@ class ZeroExportManager:
         if "is_enabled" in config:
             self.is_enabled = config["is_enabled"]
             
-        new_sensor = config.get("grid_sensor")
         self._target_watt = float(config.get("target_grid_watt", self._target_watt))
+        self._max_capacity = float(config.get("max_capacity", self._max_capacity))
+        self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
         
-        if new_sensor and new_sensor != self._grid_sensor:
-            self.stop()
-            self._grid_sensor = new_sensor
-            if self._enabled:
-                _LOGGER.info(f"Re-starting Zero Export with new sensor: {new_sensor}")
-                self._unsub = async_track_state_change_event(
-                    self.hass, [self._grid_sensor], self._handle_grid_change
-                )
-        elif self._enabled and not self._unsub and self._grid_sensor:
-             # Case where it was enabled but not tracking (e.g. after config update without sensor change)
-             self._unsub = async_track_state_change_event(
-                self.hass, [self._grid_sensor], self._handle_grid_change
-            )
+        self._update_tracker()
+
+    async def _handle_base_load_change(self, event):
+        """Handle change in one of the base load plugs."""
+        if self._is_updating:
+            return
+            
+        total_load = 0.0
+        for i in range(1, 7):
+            plug = self._config.get(f"base_plug_{i}")
+            if plug:
+                state = self.hass.states.get(plug)
+                if state and state.state not in ("unavailable", "unknown"):
+                    try:
+                        total_load += float(state.state)
+                    except ValueError:
+                        pass
+        
+        # Production should match base load + offset
+        desired_production = total_load + self._target_watt
+        await self._apply_production_limit(desired_production)
 
     async def _handle_grid_change(self, event):
         """Handle grid sensor state change."""
@@ -202,10 +237,46 @@ class ZeroExportManager:
         except ValueError:
             return
 
-        await self._adjust_power(grid_power)
+        # Get current production (W)
+        current_production = await self._get_current_production()
+        
+        # Desired Production = Current + Grid - Target
+        desired_production = current_production + grid_power - self._target_watt
+        await self._apply_production_limit(desired_production)
 
-    async def _adjust_power(self, grid_power):
-        """Calculate and set new power limit."""
+    async def _get_current_production(self):
+        """Get current solar power production."""
+        try:
+            hass_data = self.hass.data[DOMAIN].get(self.entry.entry_id)
+            if not hass_data:
+                return 0.0
+
+            coordinator = hass_data.get(HASS_DATA_COORDINATOR)
+            current_production = 0.0
+            
+            if coordinator and hasattr(coordinator, "data") and coordinator.data:
+                if hasattr(coordinator.data, 'total_ac_power'):
+                   current_production = coordinator.data.total_ac_power
+                elif isinstance(coordinator.data, dict):
+                   current_production = coordinator.data.get('total_ac_power', 0)
+            
+            if current_production == 0:
+                sensor_id = self._config.get("solar_power_sensor")
+                if not sensor_id:
+                    sensor_id = f"sensor.hoymiles_cyd_ac_power"
+                
+                states = self.hass.states.get(sensor_id)
+                if states and states.state not in ("unavailable", "unknown"):
+                    current_production = float(states.state)
+                    scale = self._config.get("solar_power_scale")
+                    if scale == "kw_to_w": current_production *= 1000
+                    elif scale == "w_to_kw": current_production /= 1000
+            return current_production
+        except Exception:
+            return 0.0
+
+    async def _apply_production_limit(self, desired_production):
+        """Calculate and set new power limit based on desired production (W)."""
         if self._is_updating:
             return
             
@@ -216,41 +287,6 @@ class ZeroExportManager:
                 return
 
             dtu = hass_data.get(HASS_DTU)
-            coordinator = hass_data.get(HASS_DATA_COORDINATOR)
-            
-            inv_type = self._config.get("inverter_type", "hoymiles")
-            if inv_type == "hoymiles" and (not dtu or not coordinator):
-                return
-
-            # Get current production (W)
-            current_production = 0
-            # Try to get it from the coordinator's data directly
-            if coordinator and hasattr(coordinator, "data") and coordinator.data:
-                # Assuming the coordinator data has a total_ac_power attribute or similar
-                # If it's a list or dict, we need to adapt
-                if hasattr(coordinator.data, 'total_ac_power'):
-                   current_production = coordinator.data.total_ac_power
-                elif isinstance(coordinator.data, dict):
-                   current_production = coordinator.data.get('total_ac_power', 0)
-            
-            # If still 0, try to find the actual sensor state
-            if current_production == 0:
-                sensor_id = self._config.get("solar_power_sensor")
-                if not sensor_id:
-                   sensor_id = f"sensor.hoymiles_cyd_ac_power"
-                
-                states = self.hass.states.get(sensor_id)
-                if states and states.state not in ("unavailable", "unknown"):
-                    current_production = float(states.state)
-                    scale = self._config.get("solar_power_scale")
-                    if scale == "kw_to_w": current_production *= 1000
-                    elif scale == "w_to_kw": current_production /= 1000
-
-            # Desired Production = Current + Grid - Target
-            # grid_power > 0 (Import), grid_power < 0 (Export)
-            # Target is what we want the grid to show (e.g. 0)
-            
-            desired_production = current_production + grid_power - self._target_watt
             
             # Safety: don't let desired production go below 0
             desired_production = max(0.0, desired_production)
@@ -270,7 +306,7 @@ class ZeroExportManager:
                 if mode == "disabled":
                     return
 
-                if inv_type == "hoymiles":
+                if inv_type == "hoymiles" and dtu:
                     target_inverter = self._config.get("selected_inverter", "all")
                     _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {new_limit}% (Target: {target_inverter})")
                     if target_inverter == "all":
@@ -280,7 +316,7 @@ class ZeroExportManager:
                             await dtu.async_set_power_limit(new_limit, [target_inverter])
                         except Exception:
                             await dtu.async_set_power_limit(new_limit)
-                else:
+                elif inv_type != "hoymiles":
                     # Generic / OpenDTU / AhoyDTU
                     limit_entity = self._config.get("external_limit_entity")
                     if not limit_entity:
@@ -290,10 +326,9 @@ class ZeroExportManager:
                     limit_unit = self._config.get("generic_limit_type", "watt")
                     final_value = desired_production if limit_unit == "watt" else new_limit
                     
-                    # Apply max capacity limit for absolute watt mode
                     if limit_unit == "watt":
                         final_value = min(float(self._max_capacity), final_value)
-                        final_value = round(final_value, 0) # Watts usually don't need decimals in most WRs
+                        final_value = round(final_value, 0)
                     
                     _LOGGER.info(f"Zero Export (Generic): Setting {limit_entity} to {final_value} {limit_unit}")
                     
@@ -306,6 +341,8 @@ class ZeroExportManager:
                     )
                 
                 self._last_limit = new_limit
+                if self._on_state_change:
+                    self._on_state_change()
                 
         except Exception as err:
             _LOGGER.error(f"Error in Zero Export adjustment: {err}")

@@ -481,6 +481,7 @@ class HoymilesCYDPanel extends LitElement {
                 <select class="cfg-select" .value="${this.config.operation_mode || 'zero_export'}"
                   @change="${(e) => this.config = { ...this.config, operation_mode: e.target.value }}">
                    <option value="zero_export">ZEN (Automatik)</option>
+                   <option value="base_load">Grundlast (Plugs)</option>
                    <option value="manual_limit">Manuell (%)</option>
                    <option value="disabled">Inaktiv</option>
                 </select>
@@ -620,6 +621,21 @@ class HoymilesCYDPanel extends LitElement {
                    </select>
                 </div>
               </div>
+        </div>
+
+        <!-- GRUNDLAST SEKTION -->
+        <div class="config-section glass sensor-section" style="margin-top: 20px;">
+           <div class="section-title"><ha-icon icon="mdi:power-plug"></ha-icon> GRUNDLAST PLUGS</div>
+           <p class="section-lead">Diese Sensoren werden summiert, wenn 'Grundlast' als Betriebsmodus gewählt ist.</p>
+           
+           <div class="picker-grid">
+              ${[1, 2, 3, 4, 5, 6].map(i => html`
+                <div class="p-card min-card">
+                   <div class="p-head">Plug ${i} (Watt)</div>
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Sensor wählen" .value="${this.config['base_plug_' + i]}"
+                     @value-changed="${(e) => this.config = { ...this.config, ['base_plug_' + i]: e.detail.value }}"></hoymiles-entity-picker>
+                </div>
+              `)}
            </div>
         </div>
 
