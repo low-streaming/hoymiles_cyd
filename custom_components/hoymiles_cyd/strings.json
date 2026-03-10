@@ -7,7 +7,8 @@
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
           "update_interval": "Update Interval (seconds)",
-          "timeout": "Timeout (seconds)"
+          "timeout": "Timeout (seconds)",
+          "use_generic": "Use OpenDTU / AhoyDTU / Generic (Inverter via external entity)"
         }
       },
       "reconfigure": {
@@ -16,7 +17,8 @@
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
           "update_interval": "Update Interval (seconds)",
-          "timeout": "Timeout (seconds)"
+          "timeout": "Timeout (seconds)",
+          "use_generic": "Use OpenDTU / AhoyDTU / Generic (Inverter via external entity)"
         }
       }
     },

@@ -175,7 +175,8 @@ class ZeroExportManager:
             dtu = hass_data.get(HASS_DTU)
             coordinator = hass_data.get(HASS_DATA_COORDINATOR)
             
-            if not dtu or not coordinator:
+            inv_type = self._config.get("inverter_type", "hoymiles")
+            if inv_type == "hoymiles" and (not dtu or not coordinator):
                 return
 
             # Get current production (W)

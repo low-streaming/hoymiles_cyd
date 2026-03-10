@@ -35,6 +35,7 @@ from .const import (
     HASS_DTU,
     HASS_ENERGY_STORAGE_DATA_COORDINATOR,
     HASS_ZERO_EXPORT_MANAGER,
+    CONF_USE_GENERIC,
 )
 from .coordinator import (
     HoymilesAppInfoUpdateCoordinator,
@@ -98,20 +99,25 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     is_encrypted = config_entry.data.get(CONF_IS_ENCRYPTED, False)
     enc_rand = config_entry.data.get(CONF_ENC_RAND, None)
     timeout = config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT_SECONDS)
+    use_generic = config_entry.data.get(CONF_USE_GENERIC, False)
 
-    if is_encrypted:
-        dtu = DTU(
-            host,
-            is_encrypted=is_encrypted,
-            enc_rand=bytes.fromhex(enc_rand),
-            timeout=timeout,
-        )
+    if not use_generic:
+        if is_encrypted:
+            dtu = DTU(
+                host,
+                is_encrypted=is_encrypted,
+                enc_rand=bytes.fromhex(enc_rand),
+                timeout=timeout,
+            )
+        else:
+            dtu = DTU(host, timeout=timeout)
+
+        hass_data[HASS_DTU] = dtu
     else:
-        dtu = DTU(host, timeout=timeout)
+        dtu = None
+        hass_data[HASS_DTU] = None
 
-    hass_data[HASS_DTU] = dtu
-
-    if single_phase_inverters or three_phase_inverters or meters:
+    if not use_generic and (single_phase_inverters or three_phase_inverters or meters):
         data_coordinator = HoymilesRealDataUpdateCoordinator(
             hass, dtu=dtu, config_entry=config_entry, update_interval=update_interval
         )
@@ -139,7 +145,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
         )
         hass_data[HASS_APP_INFO_COORDINATOR] = app_info_update_coordinator
 
-    if hybrid_inverters:
+    if not use_generic and hybrid_inverters:
         energy_storage_data_coordinator = HoymilesEnergyStorageUpdateCoordinator(
             hass=hass,
             dtu=dtu,
@@ -167,11 +173,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     hass.data[DOMAIN][config_entry.entry_id] = hass_data
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
-    if single_phase_inverters or three_phase_inverters or meters:
+    if not use_generic and (single_phase_inverters or three_phase_inverters or meters):
         await data_coordinator.async_config_entry_first_refresh()
         await config_coordinator.async_config_entry_first_refresh()
         await app_info_update_coordinator.async_config_entry_first_refresh()
-    if hybrid_inverters:
+    if not use_generic and hybrid_inverters:
         await energy_storage_data_coordinator.async_config_entry_first_refresh()
         hass.services.async_register(
             domain=DOMAIN,
@@ -204,6 +210,9 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
             "Migrating entry %s to version %s", config_entry.entry_id, CONFIG_VERSION
         )
         new = {**config_entry.data}
+
+        if config_entry.data.get(CONF_USE_GENERIC, False):
+           return True
 
         host = config_entry.data.get(CONF_HOST)
         try:

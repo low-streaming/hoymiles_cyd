@@ -6,7 +6,8 @@
         "description": "If you need help with the configuration have a look here: https://github.com/low-streaming/hoymiles_cyd",
         "data": {
           "host": "Host",
-          "update_interval": "Update Interval (seconds)"
+          "update_interval": "Update Interval (seconds)",
+          "use_generic": "Use OpenDTU / AhoyDTU / Generic (Inverter via external entity)"
         }
       },
       "reconfigure": {
@@ -14,7 +15,8 @@
         "description": "If you need help with the configuration have a look here: https://github.com/low-streaming/hoymiles_cyd",
         "data": {
           "host": "Host",
-          "update_interval": "Update Interval (seconds)"
+          "update_interval": "Update Interval (seconds)",
+          "use_generic": "Use OpenDTU / AhoyDTU / Generic (Inverter via external entity)"
         }
       }
     },
@@ -31,7 +33,7 @@
         "name": "DTU"
       }
     },
-    "number" : {
+    "number": {
       "limit_power_mypower": {
         "name": "Power limit"
       }
@@ -97,10 +99,10 @@
       "pv_sw_version": {
         "name": "SW version"
       },
-      "pv_hw_version" : {
+      "pv_hw_version": {
         "name": "HW version"
       },
-      "signal_strength" : {
+      "signal_strength": {
         "name": "Signal strength"
       },
       "voltage_phase_A": {
@@ -148,20 +150,20 @@
       "power_factor_phase_A": {
         "name": "Power factor phase A"
       },
-      "energy_to_load" : {
-        "name" : "Energy to load"
+      "energy_to_load": {
+        "name": "Energy to load"
       },
-      "energy_to_battery" : {
-        "name" : "Energy to battery"
+      "energy_to_battery": {
+        "name": "Energy to battery"
       },
-      "energy_from_pv" : {
-        "name" : "Energy from PV"
+      "energy_from_pv": {
+        "name": "Energy from PV"
       },
-      "energy_from_battery" : {
-        "name" : "Energy from battery"
+      "energy_from_battery": {
+        "name": "Energy from battery"
       },
-      "energy_from_grid" : {
-        "name" : "Energy from grid"
+      "energy_from_grid": {
+        "name": "Energy from grid"
       },
       "pv_panel_voltage": {
         "name": "PV panel {port_number} voltage"
@@ -347,18 +349,18 @@
         "name": "Power battery to grid"
       }
     },
-    "button" : {
-      "restart" : {
-        "name" : "Restart"
+    "button": {
+      "restart": {
+        "name": "Restart"
       },
-      "turn_off" : {
-        "name" : "Turn off"
+      "turn_off": {
+        "name": "Turn off"
       },
-      "turn_on" : {
-        "name" : "Turn on"
+      "turn_on": {
+        "name": "Turn on"
       },
-      "enable_performance_data_mode" : {
-        "name" : "Experimental: Enable performance data mode"
+      "enable_performance_data_mode": {
+        "name": "Experimental: Enable performance data mode"
       }
     }
   },
@@ -409,7 +411,7 @@
           "name": "Time Periods",
           "description": "Define time periods for time-of-use mode. Example:\\nn06:00-08:00-50-90|18:00-20:00-40-20"
         }
-      } 
+      }
     }
   }
 }

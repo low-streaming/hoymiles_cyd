@@ -34,6 +34,7 @@ from .const import (
     CONF_ZERO_EXPORT_MIN_LIMIT,
     CONF_ZERO_EXPORT_MAX_LIMIT,
     CONF_MAX_CAPACITY,
+    CONF_USE_GENERIC,
 )
 from .error import CannotConnect
 from .util import async_get_config_entry_data_for_host
@@ -57,6 +58,7 @@ DATA_SCHEMA = vol.Schema(
             vol.Coerce(int),
             vol.Range(min=timedelta(seconds=MIN_TIMEOUT_SECONDS).seconds),
         ),
+        vol.Optional(CONF_USE_GENERIC, default=False): bool,
     }
 )
 
@@ -84,6 +86,26 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_SECONDS
             )
             timeout = user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT_SECONDS)
+            use_generic = user_input.get(CONF_USE_GENERIC, False)
+
+            if use_generic:
+                return self.async_create_entry(
+                    title=f"{host} (Generic)",
+                    data={
+                        CONF_HOST: host,
+                        CONF_UPDATE_INTERVAL: update_interval,
+                        CONF_DTU_SERIAL_NUMBER: f"generic_{host}",
+                        CONF_INVERTERS: [],
+                        CONF_THREE_PHASE_INVERTERS: [],
+                        CONF_PORTS: [],
+                        CONF_METERS: [],
+                        CONF_HYBRID_INVERTERS: [],
+                        CONF_IS_ENCRYPTED: False,
+                        CONF_ENC_RAND: "",
+                        CONF_TIMEOUT: timeout,
+                        CONF_USE_GENERIC: True,
+                    },
+                )
 
             try:
                 (
@@ -116,6 +138,7 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         CONF_IS_ENCRYPTED: is_encrypted,
                         CONF_ENC_RAND: enc_rand,
                         CONF_TIMEOUT: timeout,
+                        CONF_USE_GENERIC: False,
                     },
                 )
 
@@ -140,6 +163,28 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             )
 
             timeout = user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT_SECONDS)
+            use_generic = user_input.get(CONF_USE_GENERIC, False)
+
+            if use_generic:
+                data = {
+                    CONF_HOST: host,
+                    CONF_UPDATE_INTERVAL: update_interval,
+                    CONF_DTU_SERIAL_NUMBER: entry.unique_id, # Keep it
+                    CONF_INVERTERS: [],
+                    CONF_THREE_PHASE_INVERTERS: [],
+                    CONF_PORTS: [],
+                    CONF_METERS: [],
+                    CONF_HYBRID_INVERTERS: [],
+                    CONF_IS_ENCRYPTED: False,
+                    CONF_ENC_RAND: "",
+                    CONF_TIMEOUT: timeout,
+                    CONF_USE_GENERIC: True,
+                }
+                self.hass.config_entries.async_update_entry(
+                    entry, data=data, version=CONFIG_VERSION
+                )
+                await self.hass.config_entries.async_reload(entry.entry_id)
+                return self.async_abort(reason="reconfigure_successful")
 
             try:
                 (
@@ -171,6 +216,7 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                     CONF_IS_ENCRYPTED: is_encrypted,
                     CONF_ENC_RAND: enc_rand,
                     CONF_TIMEOUT: timeout,
+                    CONF_USE_GENERIC: False,
                 }
 
                 self.hass.config_entries.async_update_entry(
@@ -203,6 +249,10 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         vol.Coerce(int),
                         vol.Range(min=timedelta(seconds=MIN_TIMEOUT_SECONDS).seconds),
                     ),
+                    vol.Optional(
+                        CONF_USE_GENERIC,
+                        default=entry.data.get(CONF_USE_GENERIC, False),
+                    ): bool,
                 }
             ),
             errors=errors,

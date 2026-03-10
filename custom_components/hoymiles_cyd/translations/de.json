@@ -7,7 +7,8 @@
         "data": {
           "host": "Host",
           "update_interval": "Aktualisierungsintervall (Sekunden)",
-          "timeout": "Timeout (Sekunden)"
+          "timeout": "Timeout (Sekunden)",
+          "use_generic": "OpenDTU / AhoyDTU / Generic (Inverter über externe Entity)"
         }
       },
       "reconfigure": {
@@ -16,7 +17,8 @@
         "data": {
           "host": "Host",
           "update_interval": "Aktualisierungsintervall (Sekunden)",
-          "timeout": "Timeout (Sekunden)"
+          "timeout": "Timeout (Sekunden)",
+          "use_generic": "OpenDTU / AhoyDTU / Generic (Inverter über externe Entity)"
         }
       }
     },
