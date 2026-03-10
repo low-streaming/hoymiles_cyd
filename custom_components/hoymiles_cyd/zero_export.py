@@ -163,6 +163,11 @@ class ZeroExportManager:
         """Update configuration from external source (Panel)."""
         _LOGGER.info(f"Updating Zero Export configuration from Panel: {config}")
         self._config = config
+        
+        # Apply enabled state from Panel
+        if "is_enabled" in config:
+            self.is_enabled = config["is_enabled"]
+            
         new_sensor = config.get("grid_sensor")
         self._target_watt = float(config.get("target_grid_watt", self._target_watt))
         
@@ -174,6 +179,11 @@ class ZeroExportManager:
                 self._unsub = async_track_state_change_event(
                     self.hass, [self._grid_sensor], self._handle_grid_change
                 )
+        elif self._enabled and not self._unsub and self._grid_sensor:
+             # Case where it was enabled but not tracking (e.g. after config update without sensor change)
+             self._unsub = async_track_state_change_event(
+                self.hass, [self._grid_sensor], self._handle_grid_change
+            )
 
     async def _handle_grid_change(self, event):
         """Handle grid sensor state change."""
