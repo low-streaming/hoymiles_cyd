@@ -319,7 +319,7 @@ class HoymilesCYDPanel extends LitElement {
                 <span class="val neon-orange">${(solar_p / 1000).toFixed(2)} kW</span>
               </div>
               <div class="box right">
-                <span class="lab">Haus Verbrauch</span>
+                <span class="lab">${this.config.operation_mode === 'base_load' ? 'Grundlast' : 'Haus Verbrauch'}</span>
                 <span class="val neon-blue">${(house_consumption / 1000).toFixed(2)} kW</span>
               </div>
             </div>
@@ -403,7 +403,7 @@ class HoymilesCYDPanel extends LitElement {
 
             <div class="flow-legend">
               <div class="leg-item"><span class="dot neon-orange-bg"></span> Solar</div>
-              <div class="leg-item"><span class="dot neon-blue-bg"></span> Haus</div>
+              <div class="leg-item"><span class="dot neon-blue-bg"></span> ${this.config.operation_mode === 'base_load' ? 'Grundlast' : 'Haus'}</div>
               <div class="leg-item"><span class="dot neon-pink-bg"></span> Netz Import</div>
               <div class="leg-item"><span class="dot neon-cyan-bg"></span> Netz Export</div>
               <div class="leg-item"><span class="dot neon-green-bg"></span> Batterie</div>
@@ -613,8 +613,10 @@ class HoymilesCYDPanel extends LitElement {
                 </div>
               </div>
 
-              <div class="p-card">
-                <div class="p-head"><ha-icon icon="mdi:transmission-tower"></ha-icon> Stromzähler (W)</div>
+              <div class="p-card ${this.config.operation_mode === 'base_load' ? 'disabled' : ''}">
+                <div class="p-head"><ha-icon icon="mdi:transmission-tower"></ha-icon> Stromzähler (W)
+                   ${this.config.operation_mode === 'base_load' ? html`<span style="margin-left: auto; font-size: 0.7em; color: var(--neon-orange);">(Wird bei Grundlast ignoriert)</span>` : ''}
+                </div>
                 <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.grid_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, grid_sensor: e.detail.value }}"></hoymiles-entity-picker>
                 <div class="u-sel">
