@@ -208,10 +208,9 @@ class ZeroExportManager:
             sub_plugs = []
             if self._config.get("enable_sub_consumers"):
                 for i in range(1, 5):
-                    if self._config.get(f"sub_consumer_{i}_active"):
-                        plug = self._config.get(f"sub_consumer_{i}_sensor")
-                        if plug:
-                            sub_plugs.append(plug)
+                    plug = self._config.get(f"sub_consumer_{i}_sensor")
+                    if plug:
+                        sub_plugs.append(plug)
             
             if sub_plugs:
                 _LOGGER.info(f"Zero Export: Tracking {len(sub_plugs)} sub-consumers")
@@ -299,7 +298,7 @@ class ZeroExportManager:
         # Add sub-consumers if they are active and marked as 'use_as_load'
         if self._config.get("enable_sub_consumers"):
             for i in range(1, 5):
-                if self._config.get(f"sub_consumer_{i}_active") and self._config.get(f"sub_consumer_{i}_use_as_load"):
+                if self._config.get(f"sub_consumer_{i}_use_as_load"):
                     sensor = self._config.get(f"sub_consumer_{i}_sensor")
                     if sensor:
                         state = self.hass.states.get(sensor)

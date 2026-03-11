@@ -396,9 +396,6 @@ class HoymilesCYDPanel extends LitElement {
               ${this.config.enable_sub_consumers ? html`
               <div class="sub-consumers-wrap">
                 ${[1, 2, 3, 4].map(i => {
-      const active = this.config[`sub_consumer_${i}_active`];
-      if (!active) return '';
-
       const sensor = this.config[`sub_consumer_${i}_sensor`];
       const name = this.config[`sub_consumer_${i}_name`];
       const icon = this.config[`sub_consumer_${i}_icon`] || 'mdi:power-plug';
@@ -770,16 +767,12 @@ class HoymilesCYDPanel extends LitElement {
            <p class="section-lead animate-fade-in">Hier kannst du spezifische Geräte wie Wärmepumpen oder Klimaanlagen konfigurieren, die auf dem Dashboard erscheinen sollen.</p>
            
            <div class="sub-config-grid animate-fade-in">
-              ${[1, 2, 3, 4].map(i => {
-      const isActive = this.config['sub_consumer_' + i + '_active'] || false;
-      return html`
+              ${[1, 2, 3, 4].map(i => html`
                 <div class="p-card sub-card">
-                   <div class="p-head" style="margin-bottom: ${isActive ? '25px' : '0'}; display: flex; justify-content: space-between;">
+                   <div class="p-head" style="margin-bottom: 25px; display: flex; justify-content: space-between;">
                       <span style="display: flex; align-items: center; gap: 10px;"><ha-icon icon="mdi:devices"></ha-icon> Gerät ${i} ${this.config['sub_consumer_' + i + '_name'] ? `(${this.config['sub_consumer_' + i + '_name']})` : ''}</span>
-                      <ha-switch .checked="${isActive}" @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_active']: e.target.checked }}"></ha-switch>
                    </div>
                    
-                   ${isActive ? html`
                    <div class="cfg-compact-row animate-fade-in">
                       <input type="text" class="cfg-text" placeholder="Bezeichnung (z.B. Wärmepumpe)" 
                         .value="${this.config['sub_consumer_' + i + '_name'] || ''}"
@@ -821,9 +814,8 @@ class HoymilesCYDPanel extends LitElement {
                       <ha-checkbox .checked="${this.config['sub_consumer_' + i + '_use_as_load'] || false}"
                         @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_use_as_load']: e.target.checked }}"></ha-checkbox>
                    </div>
-                   ` : ''}
                 </div>
-              `})}
+              `)}
            </div>
            ` : ''}
         </div>
@@ -1236,19 +1228,34 @@ class HoymilesCYDPanel extends LitElement {
 
       /* HELP STYLES */
       .help-content { padding: 50px; }
-      .help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
+      .help-header { border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 20px; margin-bottom: 40px; display: flex; align-items: center; gap: 15px; color: #fff; }
+      .help-header h3 { margin: 0; font-size: 1.5em; font-weight: 800; letter-spacing: 2px; }
+      .help-header ha-icon { font-size: 2em; color: var(--accent); }
+      .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 30px; }
       @media (max-width: 900px) {
         .help-grid { grid-template-columns: 1fr; }
         .help-content { padding: 30px; }
       }
-      .help-section h4 { color: #fff; font-weight: 800; margin-bottom: 15px; display: flex; align-items: center; gap: 12px; letter-spacing: 1px; }
-      .help-section ha-icon { color: var(--accent); }
-      .help-section p { color: var(--text-dim); line-height: 1.6; font-size: 0.95em; }
-      .help-section ul { padding-left: 20px; color: var(--text-dim); }
-      .help-section li { margin-bottom: 10px; font-size: 0.9em; }
+      .help-section { 
+        background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); 
+        border-radius: 20px; padding: 35px; transition: 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); position: relative;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      }
+      .help-section:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+      .help-section::before {
+        content: ''; position: absolute; top: 0; left: 35px; width: 50px; height: 3px;
+        background: var(--accent); border-radius: 0 0 5px 5px; box-shadow: 0 0 10px var(--accent-glow);
+      }
+      .help-section h4 { color: #fff; font-size: 1.15em; font-weight: 800; margin-bottom: 20px; margin-top: 0; display: flex; align-items: center; gap: 15px; letter-spacing: 1px; }
+      .help-section ha-icon { color: var(--accent); background: rgba(247, 147, 26, 0.1); padding: 10px; border-radius: 14px; }
+      .help-section p { color: var(--text-dim); line-height: 1.7; font-size: 0.95em; margin-bottom: 20px; }
+      .help-section ul { padding-left: 0; color: var(--text-dim); list-style: none; margin: 0; }
+      .help-section li { margin-bottom: 15px; font-size: 0.9em; line-height: 1.6; display: flex; align-items: flex-start; gap: 12px; }
+      .help-section li::before { content: '•'; color: var(--accent); font-size: 1.8em; line-height: 0.7; }
+      .help-section strong { color: #fff; font-weight: 700; }
       .help-footer { margin-top: 60px; text-align: center; }
-      .footer-line { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-border), transparent); margin-bottom: 20px; }
-      .help-footer p { font-size: 0.8em; color: var(--text-dim); }
+      .footer-line { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-border), transparent); margin-bottom: 25px; }
+      .help-footer p { font-size: 0.85em; color: var(--text-dim); font-weight: 500; letter-spacing: 1px; }
 
       @media (max-width: 1200px) {
         .dashboard-layout { grid-template-columns: 1fr; }
@@ -1256,11 +1263,19 @@ class HoymilesCYDPanel extends LitElement {
       }
       
       @media (max-width: 600px) {
-        .main-card { padding: 25px; }
+        .main-card { padding: 25px; min-height: 500px; }
         .labels-top .val { font-size: 1.8em; }
         .labels-top .box { padding: 10px 15px; }
-        .node { width: 50px; height: 50px; font-size: 1.25em; border-radius: 12px; }
+        .node { width: 44px; height: 44px; font-size: 1.1em; border-radius: 12px; }
         .pth-active { stroke-width: 4; }
+        .picker-grid { grid-template-columns: 1fr; }
+        .sub-config-grid { grid-template-columns: 1fr; }
+        .cfg-row { flex-direction: column; align-items: stretch; gap: 10px; padding: 15px 0;}
+        .cfg-num, .cfg-select, .input-wrap { width: 100%; max-width: none; box-sizing: border-box; }
+        .mega-save-btn { padding: 18px; font-size: 1.1em; }
+        .engine { transform: scale(0.9); transform-origin: top center; margin-bottom: 20px; }
+        .g-inner { width: 90%; height: 90%; }
+        .g-main { font-size: 2.2em; }
       }
 
       /* Sub Consumers Dashboard */
