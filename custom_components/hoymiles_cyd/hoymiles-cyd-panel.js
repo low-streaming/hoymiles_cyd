@@ -163,7 +163,11 @@ class HoymilesCYDPanel extends LitElement {
       selected_inverter: 'all',
       external_limit_entity: '',
       inverter_type: 'hoymiles',
-      generic_limit_type: 'watt'
+      generic_limit_type: 'watt',
+      sub_consumer_1_name: '', sub_consumer_1_sensor: '', sub_consumer_1_icon: 'mdi:power-plug', sub_consumer_1_toggle: '', sub_consumer_1_use_as_load: false,
+      sub_consumer_2_name: '', sub_consumer_2_sensor: '', sub_consumer_2_icon: 'mdi:power-plug', sub_consumer_2_toggle: '', sub_consumer_2_use_as_load: false,
+      sub_consumer_3_name: '', sub_consumer_3_sensor: '', sub_consumer_3_icon: 'mdi:power-plug', sub_consumer_3_toggle: '', sub_consumer_3_use_as_load: false,
+      sub_consumer_4_name: '', sub_consumer_4_sensor: '', sub_consumer_4_icon: 'mdi:power-plug', sub_consumer_4_toggle: '', sub_consumer_4_use_as_load: false
     };
     this._historyData = [];
     this._configLoaded = false;
@@ -386,6 +390,28 @@ class HoymilesCYDPanel extends LitElement {
                 <ha-icon icon="mdi:battery-high"></ha-icon>
                 ${battery_soc ? html`<div class="soc-tag neon-bg-green">${battery_soc}%</div>` : ''}
                 ${this.config.battery_power_sensor ? html`<div class="power-tag neon-bg-green">${batt_p > 0 ? '+' : ''}${batt_p.toFixed(0)}W</div>` : ''}
+              </div>
+
+              <!-- Sub Consumers Area -->
+              <div class="sub-consumers-wrap">
+                ${[1, 2, 3, 4].map(i => {
+      const sensor = this.config[`sub_consumer_${i}_sensor`];
+      const name = this.config[`sub_consumer_${i}_name`];
+      const icon = this.config[`sub_consumer_${i}_icon`] || 'mdi:power-plug';
+      const toggle = this.config[`sub_consumer_${i}_toggle`];
+      if (!name && !sensor) return '';
+
+      const state = sensor ? parseFloat(this.hass.states[sensor]?.state || 0) : 0;
+      const isOn = toggle ? (this.hass.states[toggle]?.state === 'on') : (state > 5);
+
+      return html`
+                    <div class="sub-node ${isOn ? 'on' : ''}" @click="${() => toggle && this._toggleSwitch(toggle)}">
+                      <div class="s-lab">${name}</div>
+                      <ha-icon icon="${icon}"></ha-icon>
+                      <div class="s-val">${state.toFixed(0)}W</div>
+                    </div>
+                  `;
+    })}
               </div>
 
               <div class="gauge-center">
@@ -693,29 +719,50 @@ class HoymilesCYDPanel extends LitElement {
               </div>
         </div>
 
-        <!-- GRUNDLAST SEKTION -->
-        <div class="config-section glass sensor-section" style="margin-top: 20px;">
-           <div class="section-title"><ha-icon icon="mdi:power-plug"></ha-icon> GRUNDLAST PLUGS</div>
-           <p class="section-lead">Diese Sensoren werden summiert, wenn 'Grundlast' als Betriebsmodus gewählt ist.</p>
-           
-           <div class="cfg-row" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
-              <div class="cfg-info">
-                 <div class="cfg-label">Statische Grundlast</div>
-                 <div class="cfg-desc">Fester Watt-Wert, der immer addiert wird.</div>
-              </div>
-              <div class="input-wrap">
-                 <input type="number" class="cfg-num" .value="${this.config.static_base_load || 0}"
-                   @change="${(e) => this.config = { ...this.config, static_base_load: e.target.value }}">
-                 <span class="unit-tag">W</span>
-              </div>
            </div>
+        </div>
 
-           <div class="picker-grid">
-              ${[1, 2, 3, 4, 5, 6].map(i => html`
-                <div class="p-card min-card">
-                   <div class="p-head">Plug ${i} (Watt)</div>
-                   <hoymiles-entity-picker .hass="${this.hass}" label="Sensor wählen" .value="${this.config['base_plug_' + i]}"
-                     @value-changed="${(e) => this.config = { ...this.config, ['base_plug_' + i]: e.detail.value }}"></hoymiles-entity-picker>
+        <!-- ZUSATZVERBRAUCHER SEKTION -->
+        <div class="config-section glass sensor-section" style="margin-top: 20px;">
+           <div class="section-title"><ha-icon icon="mdi:devices"></ha-icon> ZUSATZVERBRAUCHER (DASHBOARD)</div>
+           <p class="section-lead">Hier kannst du spezifische Geräte wie Wärmepumpen oder Klimaanlagen konfigurieren, die auf dem Dashboard erscheinen sollen.</p>
+           
+           <div class="sub-config-grid">
+              ${[1, 2, 3, 4].map(i => html`
+                <div class="p-card sub-card">
+                   <div class="p-head">Gerät ${i}</div>
+                   <div class="cfg-compact-row">
+                      <input type="text" class="cfg-text" placeholder="Bezeichnung (z.B. Wärmepumpe)" 
+                        .value="${this.config['sub_consumer_' + i + '_name'] || ''}"
+                        @input="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_name']: e.target.value }}">
+                      
+                      <select class="cfg-select-small" .value="${this.config['sub_consumer_' + i + '_icon'] || 'mdi:power-plug'}"
+                        @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_icon']: e.target.value }}">
+                         <option value="mdi:power-plug">Stecker</option>
+                         <option value="mdi:heat-wave">Wärmepumpe</option>
+                         <option value="mdi:bitcoin">Kryptominer</option>
+                         <option value="mdi:air-conditioner">Klimagerät</option>
+                         <option value="mdi:water-pump">Brauchwasserpumpe</option>
+                         <option value="mdi:car-electric">Elektroauto</option>
+                         <option value="mdi:washing-machine">Waschmaschine</option>
+                         <option value="mdi:dishwasher">Spülmaschine</option>
+                         <option value="mdi:water-boiler">Boiler</option>
+                         <option value="mdi:fan">Lüfter</option>
+                         <option value="mdi:lightning-bolt">Allgemein</option>
+                      </select>
+                   </div>
+
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Leistungssensor (W)" .value="${this.config['sub_consumer_' + i + '_sensor']}"
+                     @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_sensor']: e.detail.value }}"></hoymiles-entity-picker>
+
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Schalter (Optional)" .value="${this.config['sub_consumer_' + i + '_toggle']}" domain="switch,light"
+                     @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_toggle']: e.detail.value }}"></hoymiles-entity-picker>
+                   
+                   <div class="cfg-row-mini">
+                      <label>In Grundlast-Rechnung einbeziehen?</label>
+                      <ha-checkbox .checked="${this.config['sub_consumer_' + i + '_use_as_load'] || false}"
+                        @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_use_as_load']: e.target.checked }}"></ha-checkbox>
+                   </div>
                 </div>
               `)}
            </div>
@@ -1144,6 +1191,63 @@ class HoymilesCYDPanel extends LitElement {
         .node { width: 50px; height: 50px; font-size: 1.25em; border-radius: 12px; }
         .pth-active { stroke-width: 4; }
       }
+
+      /* Sub Consumers Dashboard */
+      .sub-consumers-wrap {
+        position: absolute;
+        top: 60px;
+        right: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        z-index: 60;
+      }
+      .sub-node {
+        width: 54px;
+        height: 54px;
+        border-radius: 16px;
+        background: #111;
+        border: 1px solid var(--glass-border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        cursor: pointer;
+        transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        color: var(--text-dim);
+      }
+      .sub-node:hover { transform: scale(1.1) translateX(-5px); border-color: var(--accent); color: #fff; z-index: 100; }
+      .sub-node.on { 
+        border-color: var(--neon-green); 
+        box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); 
+        color: var(--neon-green); 
+      }
+      .sub-node ha-icon { --mdc-icon-size: 22px; }
+      .sub-node .s-val { font-size: 0.65em; font-weight: 800; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+      .sub-node .s-lab { 
+        position: absolute; right: 65px; white-space: nowrap; font-size: 0.75em; font-weight: 700; 
+        color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;
+        opacity: 0; transform: translateX(10px); transition: 0.3s; pointer-events: none;
+        background: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+      }
+      .sub-node:hover .s-lab { opacity: 1; transform: translateX(0); }
+
+      /* Sub Settings Grid */
+      .sub-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+      .sub-card { padding: 15px; }
+      .cfg-compact-row { display: flex; gap: 10px; margin-bottom: 15px; }
+      .cfg-text { 
+        background: rgba(0,0,0,0.3); border: 1.5px solid var(--glass-border); color: #fff; 
+        padding: 8px 12px; border-radius: 10px; flex: 1; outline: none; font-size: 0.9em;
+      }
+      .cfg-text:focus { border-color: var(--accent); }
+      .cfg-select-small {
+        background: #1a1a1f; color: #fff; border: 1.5px solid var(--glass-border);
+        padding: 5px; border-radius: 10px; font-size: 0.8em; outline: none; cursor: pointer;
+      }
+      .cfg-row-mini { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 0.85em; color: var(--text-dim); }
     `;
   }
 }

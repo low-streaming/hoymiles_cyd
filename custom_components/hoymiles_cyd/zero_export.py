@@ -41,6 +41,7 @@ class ZeroExportManager:
         self._config = {}
         self._battery_empty_mode = False
         self._unsub_batt = None
+        self._unsub_sub = None
 
     def add_state_change_callback(self, callback_func):
         """Add callback for state changes."""
@@ -202,8 +203,25 @@ class ZeroExportManager:
                 self._unsub = async_track_state_change_event(
                     self.hass, plugs, self._handle_base_load_change
                 )
-            else:
-                _LOGGER.info("Zero Export: Base load mode active with static load only (no plugs)")
+            
+            # Sub-consumers tracking (always track if sensor is set, to trigger UI updates or calculation)
+            sub_plugs = []
+            for i in range(1, 5):
+                plug = self._config.get(f"sub_consumer_{i}_sensor")
+                if plug:
+                    sub_plugs.append(plug)
+            
+            if sub_plugs:
+                _LOGGER.info(f"Zero Export: Tracking {len(sub_plugs)} sub-consumers")
+                # We reuse the same handler if we want them to trigger calculation
+                # If they are NOT used as load, they just update the UI (which happens via HASS events anyway)
+                # but if they ARE used as load, we need to handle their changes.
+                self._unsub_sub = async_track_state_change_event(
+                    self.hass, sub_plugs, self._handle_base_load_change
+                )
+            
+            if not plugs and not sub_plugs:
+                _LOGGER.info("Zero Export: Base load mode active with static load only")
                 
             # Trigger initial update always
             self.hass.async_create_task(self._handle_base_load_change(None))
@@ -219,6 +237,9 @@ class ZeroExportManager:
         if self._unsub_batt:
             self._unsub_batt()
             self._unsub_batt = None
+        if self._unsub_sub:
+            self._unsub_sub()
+            self._unsub_sub = None
 
     def update_config(self, config: dict):
         """Update configuration from external source (Panel)."""
@@ -272,6 +293,18 @@ class ZeroExportManager:
                         total_load += float(state.state)
                     except ValueError:
                         pass
+        
+        # Add sub-consumers if they are marked as 'use_as_load'
+        for i in range(1, 5):
+            if self._config.get(f"sub_consumer_{i}_use_as_load"):
+                sensor = self._config.get(f"sub_consumer_{i}_sensor")
+                if sensor:
+                    state = self.hass.states.get(sensor)
+                    if state and state.state not in ("unavailable", "unknown"):
+                        try:
+                            total_load += float(state.state)
+                        except ValueError:
+                            pass
         
         
         # Production should match base load + offset
