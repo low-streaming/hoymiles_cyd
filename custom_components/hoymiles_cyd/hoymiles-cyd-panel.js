@@ -1261,8 +1261,8 @@ class HoymilesCYDPanel extends LitElement {
       .help-section ha-icon { color: var(--accent); background: rgba(247, 147, 26, 0.1); padding: 10px; border-radius: 14px; }
       .help-section p { color: var(--text-dim); line-height: 1.7; font-size: 0.95em; margin-bottom: 20px; }
       .help-section ul { padding-left: 0; color: var(--text-dim); list-style: none; margin: 0; }
-      .help-section li { margin-bottom: 15px; font-size: 0.9em; line-height: 1.6; display: flex; align-items: flex-start; gap: 12px; }
-      .help-section li::before { content: '•'; color: var(--accent); font-size: 1.8em; line-height: 0.7; }
+      .help-section li { margin-bottom: 15px; font-size: 0.9em; line-height: 1.6; position: relative; padding-left: 20px; }
+      .help-section li::before { content: '•'; color: var(--accent); font-size: 1.8em; line-height: 0.7; position: absolute; left: 0; top: 0px; }
       .help-section strong { color: #fff; font-weight: 700; }
       .help-footer { margin-top: 60px; text-align: center; }
       .footer-line { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-border), transparent); margin-bottom: 25px; }
@@ -1294,6 +1294,14 @@ class HoymilesCYDPanel extends LitElement {
         .cfg-row { flex-direction: column; align-items: stretch; gap: 10px; padding: 15px 0;}
         .cfg-num, .cfg-select, .input-wrap { width: 100%; max-width: none; box-sizing: border-box; }
         .mega-save-btn { padding: 18px; font-size: 1.1em; }
+        
+        /* Mobile Help & Tabs fixes */
+        .tabs { padding: 6px; gap: 6px; }
+        .tab { padding: 12px 10px; font-size: 0.75em; letter-spacing: 0; min-width: auto; }
+        .help-header h3 { font-size: 1.25em; letter-spacing: 1px; word-break: break-word; }
+        .help-header ha-icon { font-size: 1.5em; }
+        .help-section { padding: 25px 20px; }
+        .setup-title { font-size: 1.4em; }
       }
 
       /* Sub Consumers Dashboard */
