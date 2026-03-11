@@ -395,6 +395,9 @@ class HoymilesCYDPanel extends LitElement {
               <!-- Sub Consumers Area -->
               <div class="sub-consumers-wrap">
                 ${[1, 2, 3, 4].map(i => {
+      const active = this.config[`sub_consumer_${i}_active`];
+      if (!active) return '';
+
       const sensor = this.config[`sub_consumer_${i}_sensor`];
       const name = this.config[`sub_consumer_${i}_name`];
       const icon = this.config[`sub_consumer_${i}_icon`] || 'mdi:power-plug';
@@ -730,10 +733,17 @@ class HoymilesCYDPanel extends LitElement {
            <p class="section-lead">Hier kannst du spezifische Geräte wie Wärmepumpen oder Klimaanlagen konfigurieren, die auf dem Dashboard erscheinen sollen.</p>
            
            <div class="sub-config-grid">
-              ${[1, 2, 3, 4].map(i => html`
+              ${[1, 2, 3, 4].map(i => {
+      const isActive = this.config['sub_consumer_' + i + '_active'] || false;
+      return html`
                 <div class="p-card sub-card">
-                   <div class="p-head">Gerät ${i}</div>
-                   <div class="cfg-compact-row">
+                   <div class="p-head" style="margin-bottom: ${isActive ? '25px' : '0'}; display: flex; justify-content: space-between;">
+                      <span style="display: flex; align-items: center; gap: 10px;"><ha-icon icon="mdi:devices"></ha-icon> Gerät ${i} ${this.config['sub_consumer_' + i + '_name'] ? `(${this.config['sub_consumer_' + i + '_name']})` : ''}</span>
+                      <ha-switch .checked="${isActive}" @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_active']: e.target.checked }}"></ha-switch>
+                   </div>
+                   
+                   ${isActive ? html`
+                   <div class="cfg-compact-row animate-fade-in">
                       <input type="text" class="cfg-text" placeholder="Bezeichnung (z.B. Wärmepumpe)" 
                         .value="${this.config['sub_consumer_' + i + '_name'] || ''}"
                         @input="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_name']: e.target.value }}">
@@ -774,8 +784,9 @@ class HoymilesCYDPanel extends LitElement {
                       <ha-checkbox .checked="${this.config['sub_consumer_' + i + '_use_as_load'] || false}"
                         @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_use_as_load']: e.target.checked }}"></ha-checkbox>
                    </div>
+                   ` : ''}
                 </div>
-              `)}
+              `})}
            </div>
         </div>
 
@@ -1257,8 +1268,8 @@ class HoymilesCYDPanel extends LitElement {
       .sub-node:hover .s-lab { opacity: 1; transform: translateX(0); }
 
       /* Sub Settings Grid */
-      .sub-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-      .sub-card { padding: 25px; }
+      .sub-config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+      .sub-card { padding: 20px; }
       .cfg-compact-row { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
       .cfg-text { 
         background: rgba(0,0,0,0.3); border: 1.5px solid var(--glass-border); color: #fff; 
