@@ -349,36 +349,36 @@ class HoymilesCYDPanel extends LitElement {
                 
                 <!-- Active Flows -->
                 ${solar_p > 20 ? html`
-                  <path d="M 120 100 Q 300 100 300 210" class="pth-active neon-orange-stroke" />
+                  <path d="M 120 100 Q 300 100 300 210" class="pth-active neon-orange-stroke" style="animation-duration: ${Math.max(0.3, 2 - solar_p / 1000)}s;" />
                   <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-orange-glow">
                     <animateMotion dur="${Math.max(0.5, 3 - solar_p / 1000)}s" repeatCount="indefinite" path="M 120 100 Q 300 100 300 210" />
                   </circle>
                 ` : ''}
                 
                 ${house_consumption > 20 ? html`
-                  <path d="M 480 100 Q 300 100 300 210" class="pth-active neon-blue-stroke" style="animation-direction: reverse;" />
+                  <path d="M 300 210 Q 300 100 480 100" class="pth-active neon-blue-stroke" style="animation-duration: ${Math.max(0.3, 2 - house_consumption / 1000)}s;" />
                   <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-blue-glow">
                     <animateMotion dur="${Math.max(0.5, 3 - house_consumption / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 100 480 100" />
                   </circle>
                 ` : ''}
 
                 ${grid_p > 20 ? html`
-                  <path d="M 120 320 Q 300 320 300 210" class="pth-active neon-pink-stroke" />
+                  <path d="M 120 320 Q 300 320 300 210" class="pth-active neon-pink-stroke" style="animation-duration: ${Math.max(0.3, 2 - grid_p / 1000)}s;" />
                   <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-pink-glow">
                     <animateMotion dur="${Math.max(0.5, 4 - grid_p / 1000)}s" repeatCount="indefinite" path="M 120 320 Q 300 320 300 210" />
                   </circle>
                 ` : html`${grid_p < -20 ? html`
-                  <path d="M 120 320 Q 300 320 300 210" class="pth-active neon-cyan-stroke" style="animation-direction: reverse;" />
+                  <path d="M 300 210 Q 300 320 120 320" class="pth-active neon-cyan-stroke" style="animation-duration: ${Math.max(0.3, 2 - Math.abs(grid_p) / 1000)}s;" />
                   <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-cyan-glow">
                     <animateMotion dur="${Math.max(0.5, 4 - Math.abs(grid_p) / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 320 120 320" />
                   </circle>
                 ` : ''}`}
 
                 ${Math.abs(batt_p) > 20 ? html`
-                  <path d="M 480 320 Q 300 320 300 210" class="pth-active neon-green-stroke" style="${batt_p > 0 ? 'animation-direction: reverse;' : ''}" />
+                  <path d="${batt_p > 0 ? 'M 480 320 Q 300 320 300 210' : 'M 300 210 Q 300 320 480 320'}" class="pth-active neon-green-stroke" style="animation-duration: ${Math.max(0.3, 2 - Math.abs(batt_p) / 1000)}s;" />
                   <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-green-glow">
                     <animateMotion dur="${Math.max(0.5, 4 - Math.abs(batt_p) / 1000)}s" repeatCount="indefinite" 
-                      path="${batt_p > 0 ? 'M 300 210 Q 300 320 480 320' : 'M 480 320 Q 300 320 300 210'}" />
+                      path="${batt_p > 0 ? 'M 480 320 Q 300 320 300 210' : 'M 300 210 Q 300 320 480 320'}" />
                   </circle>
                 ` : ''}
               </svg>
@@ -1081,7 +1081,7 @@ class HoymilesCYDPanel extends LitElement {
       .engine { position: relative; width: 100%; max-width: 600px; height: auto; aspect-ratio: 600/420; margin: 0 auto; overflow: visible; }
       .engine-svg { position: absolute; width: 100%; height: 100%; filter: drop-shadow(0 0 8px rgba(0,0,0,0.5)); }
       .pth { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 5; stroke-linecap: round; }
-      .pth-active { stroke: var(--accent); stroke-width: 6; stroke-dasharray: 10 15; opacity: 0.3; filter: blur(2px); animation: flow-dash 1s linear infinite; }
+      .pth-active { stroke-width: 6; stroke-dasharray: 10 15; stroke-linecap: round; opacity: 0.8; filter: drop-shadow(0 0 3px rgba(255,255,255,0.2)); animation: flow-dash 1s linear infinite; }
       @keyframes flow-dash { from { stroke-dashoffset: 25; } to { stroke-dashoffset: 0; } }
 
       .node { 
