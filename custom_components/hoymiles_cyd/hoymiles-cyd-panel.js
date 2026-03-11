@@ -383,10 +383,10 @@ class HoymilesCYDPanel extends LitElement {
                 ` : ''}
               </svg>
 
-              <div class="node n-solar neon-border-orange" style="top: 68px; left: 88px;"><ha-icon icon="mdi:solar-panel-large"></ha-icon></div>
-              <div class="node n-house neon-border-blue" style="top: 68px; right: 88px;"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
-              <div class="node n-grid neon-border-pink" style="bottom: 68px; left: 88px;"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
-              <div class="node n-batt neon-border-green" style="bottom: 68px; right: 88px;">
+              <div class="node n-solar neon-border-orange" style="top: 23.8%; left: 20%;"><ha-icon icon="mdi:solar-panel-large"></ha-icon></div>
+              <div class="node n-house neon-border-blue" style="top: 23.8%; left: 80%;"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
+              <div class="node n-grid neon-border-pink" style="top: 76.2%; left: 20%;"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
+              <div class="node n-batt neon-border-green" style="top: 76.2%; left: 80%;">
                 <ha-icon icon="mdi:battery-high"></ha-icon>
                 ${battery_soc ? html`<div class="soc-tag neon-bg-green">${battery_soc}%</div>` : ''}
                 ${this.config.battery_power_sensor ? html`<div class="power-tag neon-bg-green">${batt_p > 0 ? '+' : ''}${batt_p.toFixed(0)}W</div>` : ''}
@@ -1089,9 +1089,10 @@ class HoymilesCYDPanel extends LitElement {
         background: #0d0d0f; border: 1.5px solid rgba(255,255,255,0.1); 
         display: flex; align-items: center; justify-content: center; z-index: 10; 
         font-size: 1.6em; box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        transform: translate(-50%, -50%);
         transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
-      .node:hover { transform: scale(1.15) rotate(5deg); border-color: rgba(255,255,255,0.3); }
+      .node:hover { transform: translate(-50%, -50%) scale(1.15) rotate(5deg); border-color: rgba(255,255,255,0.3); }
       .n-solar { color: var(--accent); border-color: rgba(247, 147, 26, 0.4); box-shadow: 0 0 25px rgba(247, 147, 26, 0.15); }
       .n-house { color: #fff; border-color: rgba(255,255,255,0.2); }
       .n-grid { color: #8e8e93; border-color: rgba(255,255,255,0.1); }
@@ -1123,6 +1124,16 @@ class HoymilesCYDPanel extends LitElement {
       .g-cap { font-size: min(0.75em, 3vw); color: var(--text-dim); font-weight: 700; margin-bottom: 5px; letter-spacing: 1px; }
       .g-main { font-size: min(3.4em, 12vw); font-weight: 800; color: #fff; font-family: 'JetBrains Mono', monospace; line-height: 1; letter-spacing: -2px; }
       .g-stat { font-size: min(0.9em, 4vw); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.03); }
+
+      /* --- LEGEND OVERRIDES --- */
+      .flow-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 30px; padding: 15px; background: rgba(0,0,0,0.15); border-radius: 16px; border: 1px solid var(--glass-border); }
+      .leg-item { display: flex; align-items: center; gap: 8px; font-size: 0.85em; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 8px currentColor; }
+      .neon-orange-bg { background: var(--accent); color: var(--accent); }
+      .neon-blue-bg { background: var(--neon-blue); color: var(--neon-blue); }
+      .neon-pink-bg { background: var(--neon-pink); color: var(--neon-pink); }
+      .neon-cyan-bg { background: var(--neon-cyan); color: var(--neon-cyan); }
+      .neon-green-bg { background: #2ecc71; color: #2ecc71; }
 
       /* --- GRAPH --- */
       .graph-area { margin-top: 60px; background: rgba(0,0,0,0.15); padding: 25px; border-radius: 24px; border: 1px solid var(--glass-border); }
@@ -1263,30 +1274,40 @@ class HoymilesCYDPanel extends LitElement {
       }
       
       @media (max-width: 600px) {
-        .main-card { padding: 25px; min-height: 500px; }
-        .labels-top .val { font-size: 1.8em; }
-        .labels-top .box { padding: 10px 15px; }
+        .main-card { padding: 25px 20px; min-height: auto; }
+        .labels-top { flex-direction: column; gap: 15px; }
+        .labels-top .box { padding: 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.4); text-align: left !important; }
+        .labels-top .lab { margin-bottom: 0; }
+        .labels-top .val { font-size: 1.6em; }
+        
+        .engine { transform: none; width: 100%; margin: 30px 0; aspect-ratio: 600/420; }
         .node { width: 44px; height: 44px; font-size: 1.1em; border-radius: 12px; }
         .pth-active { stroke-width: 4; }
+        .g-inner { width: 90%; height: 90%; }
+        .g-main { font-size: 2.2em; }
+        
+        .flow-legend { gap: 12px; margin-top: 15px; }
+        .leg-item { font-size: 0.75em; }
+        
         .picker-grid { grid-template-columns: 1fr; }
         .sub-config-grid { grid-template-columns: 1fr; }
         .cfg-row { flex-direction: column; align-items: stretch; gap: 10px; padding: 15px 0;}
         .cfg-num, .cfg-select, .input-wrap { width: 100%; max-width: none; box-sizing: border-box; }
         .mega-save-btn { padding: 18px; font-size: 1.1em; }
-        .engine { transform: scale(0.9); transform-origin: top center; margin-bottom: 20px; }
-        .g-inner { width: 90%; height: 90%; }
-        .g-main { font-size: 2.2em; }
       }
 
       /* Sub Consumers Dashboard */
       .sub-consumers-wrap {
         position: absolute;
-        top: 60px;
-        right: 10px;
+        top: 24%;
+        right: -10px;
         display: flex;
         flex-direction: column;
         gap: 12px;
         z-index: 60;
+      }
+      @media (max-width: 600px) {
+        .sub-consumers-wrap { right: 0; transform: scale(0.85); transform-origin: top right; top: 18%; }
       }
       .sub-node {
         width: 54px;
