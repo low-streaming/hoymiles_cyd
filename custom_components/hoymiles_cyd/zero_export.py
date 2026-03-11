@@ -33,7 +33,7 @@ class ZeroExportManager:
         self._target_watt = 0.0
         self._min_limit = 10.0
         self._max_limit = 100.0
-        self._max_capacity = 800 # Default fallback
+        self._max_capacity = 800.0 # Default fallback
         self._unsub = None
         self._last_limit = None
         self._is_updating = False
@@ -145,7 +145,7 @@ class ZeroExportManager:
         self._max_limit = options.get(CONF_ZERO_EXPORT_MAX_LIMIT, 100)
         
         # Estimate max capacity from inverter list if possible
-        self._max_capacity = options.get("max_capacity", 800)
+        self._max_capacity = float(options.get("max_capacity", 800.0))
 
         # Load existing JSON config if any
         json_path = self.hass.config.path("hoymiles_cyd_config.json")
@@ -175,6 +175,10 @@ class ZeroExportManager:
         if self._unsub_batt:
             self._unsub_batt()
             self._unsub_batt = None
+            
+        if self._unsub_sub:
+            self._unsub_sub()
+            self._unsub_sub = None
             
         if not self._enabled:
             return
@@ -336,13 +340,13 @@ class ZeroExportManager:
             return
 
         # Get current production (W)
-        current_production = await self._get_current_production()
+        current_production = self._get_current_production()
         
         # Desired Production = Current + Grid - Target
         desired_production = current_production + grid_power - self._target_watt
         await self._apply_production_limit(desired_production)
 
-    async def _get_current_production(self):
+    def _get_current_production(self) -> float:
         """Get current solar power production."""
         try:
             hass_data = self.hass.data[DOMAIN].get(self.entry.entry_id)
@@ -419,9 +423,9 @@ class ZeroExportManager:
                 new_limit = 0.0
                 desired_production = 0.0
             else:
-                new_limit = max(float(self._min_limit), min(float(self._max_limit), new_limit))
+                new_limit = max(float(self._min_limit), min(float(self._max_limit), float(new_limit)))
                 
-            new_limit = round(new_limit, 1)
+            new_limit = round(float(new_limit), 1)
 
             # Avoid small jitter
             if self._last_limit is None or abs(self._last_limit - new_limit) >= 0.5:
@@ -452,8 +456,8 @@ class ZeroExportManager:
                     final_value = desired_production if limit_unit == "watt" else new_limit
                     
                     if limit_unit == "watt":
-                        final_value = min(float(self._max_capacity), final_value)
-                        final_value = round(final_value, 0)
+                        final_value = min(float(self._max_capacity), float(final_value))
+                        final_value = int(round(float(final_value), 0))
                     
                     _LOGGER.info(f"Zero Export (Generic): Setting {limit_entity} to {final_value} {limit_unit}")
                     
