@@ -401,14 +401,16 @@ class HoymilesCYDPanel extends LitElement {
       const toggle = this.config[`sub_consumer_${i}_toggle`];
       if (!name && !sensor) return '';
 
-      const state = sensor ? parseFloat(this.hass.states[sensor]?.state || 0) : 0;
-      const isOn = toggle ? (this.hass.states[toggle]?.state === 'on') : (state > 5);
+      const state_val = sensor ? parseFloat(this.hass.states[sensor]?.state || 0) : 0;
+      const scale = this.config[`sub_consumer_${i}_scale`];
+      const power_w = scale === 'kw_to_w' ? state_val * 1000 : state_val;
+      const isOn = toggle ? (this.hass.states[toggle]?.state === 'on') : (power_w > 5);
 
       return html`
                     <div class="sub-node ${isOn ? 'on' : ''}" @click="${() => toggle && this._toggleSwitch(toggle)}">
                       <div class="s-lab">${name}</div>
                       <ha-icon icon="${icon}"></ha-icon>
-                      <div class="s-val">${state.toFixed(0)}W</div>
+                      <div class="s-val">${power_w.toFixed(0)}W</div>
                     </div>
                   `;
     })}
@@ -752,14 +754,23 @@ class HoymilesCYDPanel extends LitElement {
                       </select>
                    </div>
 
-                   <hoymiles-entity-picker .hass="${this.hass}" label="Leistungssensor (W)" .value="${this.config['sub_consumer_' + i + '_sensor']}"
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Leistungssensor" .value="${this.config['sub_consumer_' + i + '_sensor']}"
                      @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_sensor']: e.detail.value }}"></hoymiles-entity-picker>
+
+                   <div class="cfg-row-mini" style="margin-bottom: 20px;">
+                      <label style="color: var(--text-dim); font-weight: bold; font-size: 0.9em;">Einheit:</label>
+                      <select class="cfg-select-small" .value="${this.config['sub_consumer_' + i + '_scale'] || 'none'}"
+                        @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_scale']: e.target.value }}">
+                         <option value="none">Sensor liefert Watt</option>
+                         <option value="kw_to_w">Sensor liefert kW</option>
+                      </select>
+                   </div>
 
                    <hoymiles-entity-picker .hass="${this.hass}" label="Schalter (Optional)" .value="${this.config['sub_consumer_' + i + '_toggle']}" domain="switch,light"
                      @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_toggle']: e.detail.value }}"></hoymiles-entity-picker>
                    
                    <div class="cfg-row-mini">
-                      <label>In Grundlast-Rechnung einbeziehen?</label>
+                      <label style="font-size: 0.9em; font-weight: bold; color: #fff;">In Grundlast einbeziehen?</label>
                       <ha-checkbox .checked="${this.config['sub_consumer_' + i + '_use_as_load'] || false}"
                         @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_use_as_load']: e.target.checked }}"></ha-checkbox>
                    </div>
@@ -1235,19 +1246,22 @@ class HoymilesCYDPanel extends LitElement {
       .sub-node:hover .s-lab { opacity: 1; transform: translateX(0); }
 
       /* Sub Settings Grid */
-      .sub-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
-      .sub-card { padding: 15px; }
-      .cfg-compact-row { display: flex; gap: 10px; margin-bottom: 15px; }
+      .sub-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 30px; }
+      .sub-card { padding: 30px; }
+      .cfg-compact-row { display: flex; gap: 15px; margin-bottom: 25px; }
       .cfg-text { 
         background: rgba(0,0,0,0.3); border: 1.5px solid var(--glass-border); color: #fff; 
-        padding: 8px 12px; border-radius: 10px; flex: 1; outline: none; font-size: 0.9em;
+        padding: 12px 16px; border-radius: 12px; flex: 1; outline: none; font-size: 0.95em;
+        transition: 0.3s;
       }
-      .cfg-text:focus { border-color: var(--accent); }
+      .cfg-text:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(247, 147, 26, 0.2); }
       .cfg-select-small {
         background: #1a1a1f; color: #fff; border: 1.5px solid var(--glass-border);
-        padding: 5px; border-radius: 10px; font-size: 0.8em; outline: none; cursor: pointer;
+        padding: 8px 15px; border-radius: 12px; font-size: 0.9em; outline: none; cursor: pointer;
+        transition: 0.3s;
       }
-      .cfg-row-mini { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 0.85em; color: var(--text-dim); }
+      .cfg-select-small:hover, .cfg-select-small:focus { border-color: var(--accent); }
+      .cfg-row-mini { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 0.85em; color: var(--text-dim); }
     `;
   }
 }
