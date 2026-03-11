@@ -393,6 +393,7 @@ class HoymilesCYDPanel extends LitElement {
               </div>
 
               <!-- Sub Consumers Area -->
+              ${this.config.enable_sub_consumers ? html`
               <div class="sub-consumers-wrap">
                 ${[1, 2, 3, 4].map(i => {
       const active = this.config[`sub_consumer_${i}_active`];
@@ -418,6 +419,7 @@ class HoymilesCYDPanel extends LitElement {
                   `;
     })}
               </div>
+              ` : ''}
 
               <div class="gauge-center">
                 <div class="g-ring"></div>
@@ -727,12 +729,47 @@ class HoymilesCYDPanel extends LitElement {
            </div>
         </div>
 
+        <!-- GRUNDLAST SEKTION (NUR SICHTBAR IM BASE_LOAD MODUS) -->
+        ${this.config.operation_mode === 'base_load' ? html`
+        <div class="config-section glass sensor-section animate-fade-in" style="margin-top: 20px;">
+           <div class="section-title"><ha-icon icon="mdi:power-plug"></ha-icon> GRUNDLAST SENSOREN</div>
+           <p class="section-lead">Hier konfigurierst du die statische Grundlast und die spezifischen Steckdosen (Plugs), die dein variables "Grundlast-Profil" bilden.</p>
+           
+           <div class="cfg-row" style="margin-bottom: 25px;">
+              <div class="cfg-info">
+                 <div class="cfg-label">Statische Grundlast</div>
+                 <div class="cfg-desc">Fester Wert in Watt (z.B. 40W für Router & Kühlschrank).</div>
+              </div>
+              <div class="input-wrap">
+                 <input type="number" class="cfg-num" .value="${this.config.static_base_load || 0}"
+                   @change="${(e) => this.config = { ...this.config, static_base_load: e.target.value }}">
+                 <span class="unit-tag">W</span>
+              </div>
+           </div>
+
+           <div class="sub-config-grid">
+              ${[1, 2, 3, 4, 5, 6].map(i => html`
+                <div class="p-card sub-card">
+                   <div class="p-head"><ha-icon icon="mdi:power-socket-eu"></ha-icon> Strom-Plug ${i}</div>
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Leistungssensor (W)" .value="${this.config['base_plug_' + i]}"
+                     @value-changed="${(e) => this.config = { ...this.config, ['base_plug_' + i]: e.detail.value }}"></hoymiles-entity-picker>
+                </div>
+              `)}
+           </div>
+        </div>
+        ` : ''}
+
         <!-- ZUSATZVERBRAUCHER SEKTION -->
         <div class="config-section glass sensor-section" style="margin-top: 20px;">
-           <div class="section-title"><ha-icon icon="mdi:devices"></ha-icon> ZUSATZVERBRAUCHER (DASHBOARD)</div>
-           <p class="section-lead">Hier kannst du spezifische Geräte wie Wärmepumpen oder Klimaanlagen konfigurieren, die auf dem Dashboard erscheinen sollen.</p>
+           <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: ${this.config.enable_sub_consumers ? '15px' : '0'}; border-bottom: ${this.config.enable_sub_consumers ? '1px solid rgba(255,255,255,0.05)' : 'none'}; padding-bottom: ${this.config.enable_sub_consumers ? '15px' : '0'};">
+             <span style="display: flex; align-items: center; gap: 15px;"><ha-icon icon="mdi:devices"></ha-icon> ZUSATZVERBRAUCHER (DASHBOARD)</span>
+             <ha-switch .checked="${this.config.enable_sub_consumers || false}" @change="${(e) => { this.config = { ...this.config, enable_sub_consumers: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+           </div>
            
-           <div class="sub-config-grid">
+           ${this.config.enable_sub_consumers ? html`
+           <p class="section-lead animate-fade-in">Hier kannst du spezifische Geräte wie Wärmepumpen oder Klimaanlagen konfigurieren, die auf dem Dashboard erscheinen sollen.</p>
+           
+           <div class="sub-config-grid animate-fade-in">
               ${[1, 2, 3, 4].map(i => {
       const isActive = this.config['sub_consumer_' + i + '_active'] || false;
       return html`
@@ -788,6 +825,7 @@ class HoymilesCYDPanel extends LitElement {
                 </div>
               `})}
            </div>
+           ` : ''}
         </div>
 
         <button class="mega-save-btn" @click="${this._saveConfig}">

@@ -206,11 +206,12 @@ class ZeroExportManager:
             
             # Sub-consumers tracking (always track if sensor is set, to trigger UI updates or calculation)
             sub_plugs = []
-            for i in range(1, 5):
-                if self._config.get(f"sub_consumer_{i}_active"):
-                    plug = self._config.get(f"sub_consumer_{i}_sensor")
-                    if plug:
-                        sub_plugs.append(plug)
+            if self._config.get("enable_sub_consumers"):
+                for i in range(1, 5):
+                    if self._config.get(f"sub_consumer_{i}_active"):
+                        plug = self._config.get(f"sub_consumer_{i}_sensor")
+                        if plug:
+                            sub_plugs.append(plug)
             
             if sub_plugs:
                 _LOGGER.info(f"Zero Export: Tracking {len(sub_plugs)} sub-consumers")
@@ -296,20 +297,21 @@ class ZeroExportManager:
                         pass
         
         # Add sub-consumers if they are active and marked as 'use_as_load'
-        for i in range(1, 5):
-            if self._config.get(f"sub_consumer_{i}_active") and self._config.get(f"sub_consumer_{i}_use_as_load"):
-                sensor = self._config.get(f"sub_consumer_{i}_sensor")
-                if sensor:
-                    state = self.hass.states.get(sensor)
-                    if state and state.state not in ("unavailable", "unknown"):
-                        try:
-                            val = float(state.state)
-                            scale = self._config.get(f"sub_consumer_{i}_scale")
-                            if scale == "kw_to_w":
-                                val *= 1000
-                            total_load += val
-                        except ValueError:
-                            pass
+        if self._config.get("enable_sub_consumers"):
+            for i in range(1, 5):
+                if self._config.get(f"sub_consumer_{i}_active") and self._config.get(f"sub_consumer_{i}_use_as_load"):
+                    sensor = self._config.get(f"sub_consumer_{i}_sensor")
+                    if sensor:
+                        state = self.hass.states.get(sensor)
+                        if state and state.state not in ("unavailable", "unknown"):
+                            try:
+                                val = float(state.state)
+                                scale = self._config.get(f"sub_consumer_{i}_scale")
+                                if scale == "kw_to_w":
+                                    val *= 1000
+                                total_load += val
+                            except ValueError:
+                                pass
         
         
         # Production should match base load + offset
