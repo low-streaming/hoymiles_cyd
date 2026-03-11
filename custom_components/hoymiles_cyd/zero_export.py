@@ -302,7 +302,11 @@ class ZeroExportManager:
                     state = self.hass.states.get(sensor)
                     if state and state.state not in ("unavailable", "unknown"):
                         try:
-                            total_load += float(state.state)
+                            val = float(state.state)
+                            scale = self._config.get(f"sub_consumer_{i}_scale")
+                            if scale == "kw_to_w":
+                                val *= 1000
+                            total_load += val
                         except ValueError:
                             pass
         

@@ -757,20 +757,20 @@ class HoymilesCYDPanel extends LitElement {
                    <hoymiles-entity-picker .hass="${this.hass}" label="Leistungssensor" .value="${this.config['sub_consumer_' + i + '_sensor']}"
                      @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_sensor']: e.detail.value }}"></hoymiles-entity-picker>
 
-                   <div class="cfg-row-mini" style="margin-bottom: 20px;">
-                      <label style="color: var(--text-dim); font-weight: bold; font-size: 0.9em;">Einheit:</label>
+                   <div style="margin-bottom: 20px;">
+                      <label style="display: block; color: var(--text-dim); font-weight: bold; font-size: 0.85em; margin-bottom: 8px; text-transform: uppercase;">Einheit des Sensors:</label>
                       <select class="cfg-select-small" .value="${this.config['sub_consumer_' + i + '_scale'] || 'none'}"
                         @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_scale']: e.target.value }}">
-                         <option value="none">Sensor liefert Watt</option>
-                         <option value="kw_to_w">Sensor liefert kW</option>
+                         <option value="none">Daten sind in Watt (W)</option>
+                         <option value="kw_to_w">Daten sind in Kilowatt (kW)</option>
                       </select>
                    </div>
 
                    <hoymiles-entity-picker .hass="${this.hass}" label="Schalter (Optional)" .value="${this.config['sub_consumer_' + i + '_toggle']}" domain="switch,light"
                      @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_toggle']: e.detail.value }}"></hoymiles-entity-picker>
                    
-                   <div class="cfg-row-mini">
-                      <label style="font-size: 0.9em; font-weight: bold; color: #fff;">In Grundlast einbeziehen?</label>
+                   <div class="cfg-row-mini" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
+                      <label style="font-size: 0.9em; font-weight: bold; color: var(--accent);">In Grundlast einbeziehen?</label>
                       <ha-checkbox .checked="${this.config['sub_consumer_' + i + '_use_as_load'] || false}"
                         @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_use_as_load']: e.target.checked }}"></ha-checkbox>
                    </div>
@@ -826,7 +826,18 @@ class HoymilesCYDPanel extends LitElement {
           </div>
 
           <div class="help-section">
-            <h4><ha-icon icon="mdi:alert-circle-outline"></ha-icon> 4. FEHLERBEHEBUNG</h4>
+            <h4><ha-icon icon="mdi:devices"></ha-icon> 4. ZUSATZVERBRAUCHER</h4>
+            <p>Unter "Zusatzverbraucher" kannst du gezielt große Geräte wie eine Wärmepumpe oder Krypto-Miner anbinden:</p>
+            <ul>
+              <li><strong>Dashboard-Anzeige:</strong> Geräte über 5W Verbrauch leuchten im Dashboard automatisch grün als aktives Icon auf.</li>
+              <li><strong>Schalter (Toggle):</strong> Wenn du einen optionalen Schalter angibst, kannst du durch Klick auf das Icon im Dashboard das Gerät direkt ein/ausschalten.</li>
+              <li><strong>Umrechnung:</strong> Falls dein Sensor Werte in kW statt W liefert, kannst du dies in der Konfiguration angeben.</li>
+              <li><strong>Grundlast-Automatik:</strong> Mit dem Haken "In Grundlast einbeziehen" wird der Verbraucher live oben auf die fixe / statische Grundlast addiert. Die ZEN-Steuerung fordert dann exakt diese Gesamtleistung extra vom Panel an!</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h4><ha-icon icon="mdi:alert-circle-outline"></ha-icon> 5. FEHLERBEHEBUNG</h4>
             <p>Solltest du Probleme haben:</p>
             <ul>
               <li><strong>Schalter reagiert nicht:</strong> Seite neu laden (Browser-Cache).</li>
@@ -1246,22 +1257,23 @@ class HoymilesCYDPanel extends LitElement {
       .sub-node:hover .s-lab { opacity: 1; transform: translateX(0); }
 
       /* Sub Settings Grid */
-      .sub-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 30px; }
-      .sub-card { padding: 30px; }
-      .cfg-compact-row { display: flex; gap: 15px; margin-bottom: 25px; }
+      .sub-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+      .sub-card { padding: 25px; }
+      .cfg-compact-row { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
       .cfg-text { 
         background: rgba(0,0,0,0.3); border: 1.5px solid var(--glass-border); color: #fff; 
-        padding: 12px 16px; border-radius: 12px; flex: 1; outline: none; font-size: 0.95em;
+        padding: 12px 16px; border-radius: 12px; width: 100%; box-sizing: border-box; outline: none; font-size: 0.95em;
         transition: 0.3s;
       }
       .cfg-text:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(247, 147, 26, 0.2); }
       .cfg-select-small {
         background: #1a1a1f; color: #fff; border: 1.5px solid var(--glass-border);
-        padding: 8px 15px; border-radius: 12px; font-size: 0.9em; outline: none; cursor: pointer;
+        padding: 12px 16px; border-radius: 12px; font-size: 0.9em; outline: none; cursor: pointer;
+        width: 100%; box-sizing: border-box;
         transition: 0.3s;
       }
       .cfg-select-small:hover, .cfg-select-small:focus { border-color: var(--accent); }
-      .cfg-row-mini { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 0.85em; color: var(--text-dim); }
+      .cfg-row-mini { display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; color: var(--text-dim); }
     `;
   }
 }
