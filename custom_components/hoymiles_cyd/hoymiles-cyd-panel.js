@@ -159,6 +159,9 @@ class HoymilesCYDPanel extends LitElement {
       battery_soc_sensor: '',
       battery_power_sensor: '',
       target_grid_watt: 10,
+      max_capacity: 800,
+      min_limit: 10,
+      max_limit: 100,
       operation_mode: 'zero_export',
       selected_inverter: 'all',
       external_limit_entity: '',
@@ -619,6 +622,30 @@ class HoymilesCYDPanel extends LitElement {
                 </div>
              </div>
 
+             <div class="cfg-row">
+                <div class="cfg-info">
+                   <div class="cfg-label">Minimale Einspeisung (Limit)</div>
+                   <div class="cfg-desc">Das Minimum in %, auf das der WR in der Automatik regelt (z.B. 10%).</div>
+                </div>
+                <div class="input-wrap">
+                   <input type="number" class="cfg-num" .value="${this.config.min_limit || 10}"
+                     @change="${(e) => this.config = { ...this.config, min_limit: e.target.value }}">
+                   <span class="unit-tag">%</span>
+                </div>
+             </div>
+
+             <div class="cfg-row">
+                <div class="cfg-info">
+                   <div class="cfg-label">Maximale Einspeisung (Limit)</div>
+                   <div class="cfg-desc">Das Maximum in %, auf das der WR in der Automatik regelt (z.B. 100%).</div>
+                </div>
+                <div class="input-wrap">
+                   <input type="number" class="cfg-num" .value="${this.config.max_limit || 100}"
+                     @change="${(e) => this.config = { ...this.config, max_limit: e.target.value }}">
+                   <span class="unit-tag">%</span>
+                </div>
+             </div>           </div>
+
               <div class="info-box-neon">
                  <ha-icon icon="mdi:information-outline"></ha-icon>
                  <span>Die Automatik (ZEN) berechnet sekündlich das optimale Limit für deine Wechselrichter.</span>
@@ -842,8 +869,8 @@ class HoymilesCYDPanel extends LitElement {
             <h4><ha-icon icon="mdi:rocket-launch"></ha-icon> 1. ERSTE SCHRITTE</h4>
             <p>Um die Nulleinspeisung (ZEN) zu nutzen, musst du zuerst deine Hardware definieren:</p>
             <ul>
-              <li><strong>Hoymiles DTU:</strong> Direkte Steuerung über die offizielle DTU.</li>
-              <li><strong>OpenDTU / AhoyDTU:</strong> Steuerung über MQTT-Entities (typischerweise ein <code>number</code>-Sensor für das Limit).</li>
+              <li><strong>Hoymiles DTU:</strong> Direkte Steuerung über die offizielle DTU. Limits werden in Prozent gesetzt.</li>
+              <li><strong>OpenDTU / AhoyDTU:</strong> Steuerung über MQTT-Entities (typischerweise ein <code>number</code>-Sensor). Du kannst hier Watt oder % als Skala wählen.</li>
             </ul>
           </div>
 
@@ -858,32 +885,42 @@ class HoymilesCYDPanel extends LitElement {
           </div>
 
           <div class="help-section">
-            <h4><ha-icon icon="mdi:brain"></ha-icon> 3. DIE ZEN-AUTOMATIK</h4>
-            <p>Der <strong>Zero Export Network (ZEN)</strong> Algorithmus berechnet jede Sekunde das optimale Limit:</p>
+            <h4><ha-icon icon="mdi:brain"></ha-icon> 3. ZEN-AUTOMATIK & LIMITS</h4>
+            <p>Der <strong>Zero Export Network (ZEN)</strong> Algorithmus berechnet sekündlich das optimale Limit:</p>
             <ul>
-              <li><strong>Ziel-Bezug:</strong> Ein kleiner Puffer (z.B. 10W) verhindert, dass Regelverzögerungen zur ungewollten Einspeisung führen.</li>
-              <li><strong>Max. Kapazität:</strong> Gib hier die maximale AC-Leistung deiner Inverter an (z.B. 800W).</li>
+              <li><strong>Ziel-Bezug:</strong> Ein kleiner Puffer (z.B. 10W) schützt dich vor ungewollter Einspeisung bei plötzlichen Lastabwürfen.</li>
+              <li><strong>Hardware-Limits:</strong> Setze die <strong>Minimale Einspeisung (z.B. 10%)</strong> in den Einstellungen. Das verhindert, dass Dritt-Systeme wie OpenDTU bei zu kleinen Werten (z.B. 0W) abstürzen. Die Automatik regelt sicherheitsbedingt nie unter diesen Wert (außer der Akku ist leer).</li>
+              <li><strong>Maximale Einspeisung:</strong> Deckle die Export-Power (z.B. 100%), wenn du Batterien laden oder das Netz schonen möchtest.</li>
             </ul>
           </div>
 
           <div class="help-section">
             <h4><ha-icon icon="mdi:devices"></ha-icon> 4. ZUSATZVERBRAUCHER</h4>
-            <p>Unter "Zusatzverbraucher" kannst du gezielt große Geräte wie eine Wärmepumpe oder Krypto-Miner anbinden:</p>
+            <p>Binde gezielt große Geräte wie eine Wärmepumpe oder Speicher an:</p>
             <ul>
-              <li><strong>Dashboard-Anzeige:</strong> Geräte über 5W Verbrauch leuchten im Dashboard automatisch grün als aktives Icon auf.</li>
-              <li><strong>Schalter (Toggle):</strong> Wenn du einen optionalen Schalter angibst, kannst du durch Klick auf das Icon im Dashboard das Gerät direkt ein/ausschalten.</li>
-              <li><strong>Umrechnung:</strong> Falls dein Sensor Werte in kW statt W liefert, kannst du dies in der Konfiguration angeben.</li>
-              <li><strong>Grundlast-Automatik:</strong> Mit dem Haken "In Grundlast einbeziehen" wird der Verbraucher live oben auf die fixe / statische Grundlast addiert. Die ZEN-Steuerung fordert dann exakt diese Gesamtleistung extra vom Panel an!</li>
+              <li><strong>Dashboard-Anzeige:</strong> Geräte über 5W Verbrauch leuchten im Dashboard automatisch als aktives Icon.</li>
+              <li><strong>Schalter (Toggle):</strong> Wenn du einen optionalen Schalter angibst, kannst du durch Klick auf das Icon im Dashboard das Gerät ein- oder ausschalten.</li>
+              <li><strong>Grundlast-Automatik:</strong> Mit dem Haken "In Grundlast einbeziehen" wird der Live-Verbraucher oben auf die feste Grundlast addiert. Das führt dazu, dass ZEN diesen Strom explizit generiert!</li>
             </ul>
           </div>
 
           <div class="help-section">
-            <h4><ha-icon icon="mdi:alert-circle-outline"></ha-icon> 5. FEHLERBEHEBUNG</h4>
+            <h4><ha-icon icon="mdi:battery-shield"></ha-icon> 5. BATTERIESCHUTZ</h4>
+            <p>Schütze deinen Speicher vor Tiefen- oder Überladung:</p>
+            <ul>
+              <li><strong>Aktivierung:</strong> Gib deinen "Batterie SOC (%)" Sensor an und aktiviere den Batterieschutz unter Einstellungen.</li>
+              <li><strong>Abschalt-Limit (z.B. 10%):</strong> Erreicht die Batterie diesen Wert, wird die Einspeisung sofort komplett auf 0W gestoppt.</li>
+              <li><strong>Einschalt-Limit (z.B. 15%):</strong> Erst wenn dieser Puffer wieder erreicht wurde, nimmt die Nulleinspeisung ihre Arbeit auf (gesunde Hysterese).</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h4><ha-icon icon="mdi:alert-circle-outline"></ha-icon> 6. FEHLERBEHEBUNG</h4>
             <p>Solltest du Probleme haben:</p>
             <ul>
-              <li><strong>Schalter reagiert nicht:</strong> Seite neu laden (Browser-Cache).</li>
-              <li><strong>Limit wird nicht gesetzt:</strong> Prüfe, ob die "External Limit Entity" korrekt beschreibbar ist.</li>
-              <li><strong>Falsche Werte:</strong> Kontrolliere die Einheiten (Watt vs. Prozent).</li>
+              <li><strong>Limit-Jitter:</strong> Das System filtert schwankende Anforderungen heraus (0.5% bzw. 5W Threshold), um die Wechselrichter-Logik zu schonen.</li>
+              <li><strong>Limit wird nicht gesetzt:</strong> Prüfe, ob die "External Limit Entity" korrekt beschreibbar / erreichbar ist.</li>
+              <li><strong>0W statt Limit:</strong> Kontrolliere deine % und Watt Mapping Einstellungen (Watt vs. Prozent Limits).</li>
             </ul>
           </div>
         </div>

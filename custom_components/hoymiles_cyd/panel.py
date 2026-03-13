@@ -91,6 +91,9 @@ class HoymilesCYDConfigView(HomeAssistantView):
                 "battery_power_sensor": "",
                 "battery_soc_sensor": "",
                 "target_grid_watt": 10,
+                "max_capacity": 800,
+                "min_limit": 10,
+                "max_limit": 100,
                 "is_enabled": False,
                 "operation_mode": "zero_export",
                 "selected_inverter": "all"

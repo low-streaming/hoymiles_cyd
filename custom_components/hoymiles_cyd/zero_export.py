@@ -163,6 +163,8 @@ class ZeroExportManager:
             self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
             self._target_watt = float(config.get("target_grid_watt", self._target_watt))
             self._max_capacity = float(config.get("max_capacity", self._max_capacity))
+            self._min_limit = float(config.get("min_limit", self._min_limit))
+            self._max_limit = float(config.get("max_limit", self._max_limit))
 
         self._update_tracker()
 
@@ -257,6 +259,8 @@ class ZeroExportManager:
             
         self._target_watt = float(config.get("target_grid_watt", self._target_watt))
         self._max_capacity = float(config.get("max_capacity", self._max_capacity))
+        self._min_limit = float(config.get("min_limit", self._min_limit))
+        self._max_limit = float(config.get("max_limit", self._max_limit))
         self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
         
         self._update_tracker()
@@ -420,31 +424,39 @@ class ZeroExportManager:
             
             # Apply constraints overrides for empty battery
             if self._battery_empty_mode:
-                new_limit = 0.0
-                desired_production = 0.0
+                final_percent = 0.0
+                final_watts = 0.0
             else:
-                new_limit = max(float(self._min_limit), min(float(self._max_limit), float(new_limit)))
+                final_percent = max(float(self._min_limit), min(float(self._max_limit), (desired_production / self._max_capacity) * 100))
+                min_watts = (float(self._min_limit) / 100.0) * float(self._max_capacity)
+                max_watts = (float(self._max_limit) / 100.0) * float(self._max_capacity)
+                final_watts = max(min_watts, min(max_watts, float(desired_production)))
                 
-            new_limit = round(float(new_limit), 1)
+            final_percent = round(float(final_percent), 1)
+            final_watts = int(round(float(final_watts), 0))
+
+            mode = self._config.get("operation_mode", "zero_export")
+            inv_type = self._config.get("inverter_type", "hoymiles")
+            
+            if mode == "disabled":
+                return
+
+            limit_unit = self._config.get("generic_limit_type", "percent") if inv_type != "hoymiles" else "percent"
+            current_target = final_watts if limit_unit == "watt" else final_percent
+            jitter_threshold = 5 if limit_unit == "watt" else 0.5
 
             # Avoid small jitter
-            if self._last_limit is None or abs(self._last_limit - new_limit) >= 0.5:
-                mode = self._config.get("operation_mode", "zero_export")
-                inv_type = self._config.get("inverter_type", "hoymiles")
-                
-                if mode == "disabled":
-                    return
-
+            if self._last_limit is None or abs(self._last_limit - current_target) >= jitter_threshold:
                 if inv_type == "hoymiles" and dtu:
                     target_inverter = self._config.get("selected_inverter", "all")
-                    _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {new_limit}% (Target: {target_inverter})")
+                    _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {final_percent}% (Target: {target_inverter})")
                     if target_inverter == "all":
-                        await dtu.async_set_power_limit(new_limit)
+                        await dtu.async_set_power_limit(final_percent)
                     else:
                         try:
-                            await dtu.async_set_power_limit(new_limit, [target_inverter])
+                            await dtu.async_set_power_limit(final_percent, [target_inverter])
                         except Exception:
-                            await dtu.async_set_power_limit(new_limit)
+                            await dtu.async_set_power_limit(final_percent)
                 elif inv_type != "hoymiles":
                     # Generic / OpenDTU / AhoyDTU
                     limit_entity = self._config.get("external_limit_entity")
@@ -452,24 +464,17 @@ class ZeroExportManager:
                         _LOGGER.warning(f"Zero Export: External mode {inv_type} enabled but no limit entity configured")
                         return
                     
-                    limit_unit = self._config.get("generic_limit_type", "watt")
-                    final_value = desired_production if limit_unit == "watt" else new_limit
-                    
-                    if limit_unit == "watt":
-                        final_value = min(float(self._max_capacity), float(final_value))
-                        final_value = int(round(float(final_value), 0))
-                    
-                    _LOGGER.info(f"Zero Export (Generic): Setting {limit_entity} to {final_value} {limit_unit}")
+                    _LOGGER.info(f"Zero Export (Generic): Setting {limit_entity} to {current_target} {limit_unit}")
                     
                     domain_part = limit_entity.split('.')[0]
                     await self.hass.services.async_call(
                         domain_part,
                         "set_value",
-                        {"entity_id": limit_entity, "value": final_value},
+                        {"entity_id": limit_entity, "value": current_target},
                         blocking=True
                     )
                 
-                self._last_limit = new_limit
+                self._last_limit = current_target
                 self._trigger_callbacks()
                 
         except Exception as err:
