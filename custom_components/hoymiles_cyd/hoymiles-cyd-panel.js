@@ -644,16 +644,11 @@ class HoymilesCYDPanel extends LitElement {
                      @change="${(e) => this.config = { ...this.config, max_limit: e.target.value }}">
                    <span class="unit-tag">%</span>
                 </div>
-             </div>           </div>
-
-              <div class="info-box-neon">
-                 <ha-icon icon="mdi:information-outline"></ha-icon>
-                 <span>Die Automatik (ZEN) berechnet sekündlich das optimale Limit für deine Wechselrichter.</span>
-              </div>
+             </div>
            </div>
 
            <!-- BATTERIESCHUTZ -->
-           <div class="config-section glass">
+           <div class="config-section glass" style="display: flex; flex-direction: column;">
               <div class="section-title"><ha-icon icon="mdi:battery-shield"></ha-icon> BATTERIESCHUTZ</div>
               
               <div class="cfg-row" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
@@ -669,7 +664,7 @@ class HoymilesCYDPanel extends LitElement {
               <div class="cfg-row">
                  <div class="cfg-info">
                     <div class="cfg-label">Abschalt-Limit (SOC %)</div>
-                    <div class="cfg-desc">Bei diesem Wert wird das Limit auf 0W gesetzt (Ausschalten).</div>
+                    <div class="cfg-desc">Bei diesem Wert wird das Limit auf 0W gesetzt.</div>
                  </div>
                  <div class="input-wrap">
                     <input type="number" class="cfg-num" .value="${this.config.battery_min_soc || 10}"
@@ -681,7 +676,7 @@ class HoymilesCYDPanel extends LitElement {
               <div class="cfg-row">
                  <div class="cfg-info">
                     <div class="cfg-label">Einschalt-Limit (SOC %)</div>
-                    <div class="cfg-desc">Erst ab diesem Wert wird die Einspeisung wieder freigegeben.</div>
+                    <div class="cfg-desc">Erst ab diesem Wert wird wieder freigegeben.</div>
                  </div>
                  <div class="input-wrap">
                     <input type="number" class="cfg-num" .value="${this.config.battery_restart_soc || 15}"
@@ -690,6 +685,19 @@ class HoymilesCYDPanel extends LitElement {
                  </div>
               </div>
               ` : ''}
+              
+              <div style="flex: 1;"></div>
+           </div>
+
+           <!-- INFO PANEL -->
+           <div class="config-section glass" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(0, 210, 255, 0.03); border-color: rgba(0, 210, 255, 0.2); box-shadow: 0 0 30px rgba(0, 210, 255, 0.05) inset; padding: 40px;">
+              <div style="background: rgba(0, 210, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; border: 1px solid rgba(0, 210, 255, 0.3);">
+                 <ha-icon icon="mdi:brain" style="font-size: 3em; color: var(--neon-blue); filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.5));"></ha-icon>
+              </div>
+              <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 1.3em; letter-spacing: 2px;">DIE ZEN AUTOMATIK</h3>
+              <p style="color: var(--text-dim); line-height: 1.7; margin: 0; font-size: 0.95em;">
+                Der <strong style="color: #fff;">Z</strong>ero <strong style="color: #fff;">E</strong>xport <strong style="color: #fff;">N</strong>etwork Algorithmus überwacht sekündlich deinen Stromzähler. Er kalkuliert den Echtzeit-Verbrauch und dynamisiert das Limit deiner Wechselrichter – das Netz bleibt sicher, dein Heim ertragsstark!
+              </p>
            </div>
         </div>
 
