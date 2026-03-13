@@ -1284,34 +1284,42 @@ class HoymilesCYDPanel extends LitElement {
 
       /* HELP STYLES */
       .help-content { padding: 50px; }
-      .help-header { border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 20px; margin-bottom: 40px; display: flex; align-items: center; gap: 15px; color: #fff; }
-      .help-header h3 { margin: 0; font-size: 1.5em; font-weight: 800; letter-spacing: 2px; }
-      .help-header ha-icon { font-size: 2em; color: var(--accent); }
-      .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 30px; }
+      .help-header { border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 25px; margin-bottom: 45px; display: flex; align-items: center; gap: 20px; color: #fff; }
+      .help-header h3 { margin: 0; font-size: 1.8em; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+      .help-header ha-icon { font-size: 2.5em; color: var(--accent); filter: drop-shadow(0 0 15px var(--accent-glow)); }
+      .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 35px; }
       @media (max-width: 900px) {
-        .help-grid { grid-template-columns: 1fr; }
+        .help-grid { grid-template-columns: 1fr; gap: 25px; }
         .help-content { padding: 30px; }
       }
       .help-section { 
         background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); 
-        border-radius: 20px; padding: 35px; transition: 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); position: relative;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        border-radius: 24px; padding: 40px; transition: 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); position: relative;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.2), 0 10px 30px rgba(0,0,0,0.3);
+        display: flex; flex-direction: column;
       }
-      .help-section:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+      .help-section:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); transform: translateY(-5px); box-shadow: inset 0 0 30px rgba(255,255,255,0.01), 0 20px 40px rgba(0,0,0,0.5); }
       .help-section::before {
-        content: ''; position: absolute; top: 0; left: 35px; width: 50px; height: 3px;
-        background: var(--accent); border-radius: 0 0 5px 5px; box-shadow: 0 0 10px var(--accent-glow);
+        content: ''; position: absolute; top: 0; left: 40px; width: 60px; height: 4px;
+        background: var(--accent); border-radius: 0 0 6px 6px; box-shadow: 0 0 15px var(--accent-glow);
       }
-      .help-section h4 { color: #fff; font-size: 1.15em; font-weight: 800; margin-bottom: 20px; margin-top: 0; display: flex; align-items: center; gap: 15px; letter-spacing: 1px; }
-      .help-section ha-icon { color: var(--accent); background: rgba(247, 147, 26, 0.1); padding: 10px; border-radius: 14px; }
-      .help-section p { color: var(--text-dim); line-height: 1.7; font-size: 0.95em; margin-bottom: 20px; }
-      .help-section ul { padding-left: 0; color: var(--text-dim); list-style: none; margin: 0; }
-      .help-section li { margin-bottom: 15px; font-size: 0.9em; line-height: 1.6; position: relative; padding-left: 20px; }
-      .help-section li::before { content: '•'; color: var(--accent); font-size: 1.8em; line-height: 0.7; position: absolute; left: 0; top: 0px; }
-      .help-section strong { color: #fff; font-weight: 700; }
-      .help-footer { margin-top: 60px; text-align: center; }
-      .footer-line { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-border), transparent); margin-bottom: 25px; }
-      .help-footer p { font-size: 0.85em; color: var(--text-dim); font-weight: 500; letter-spacing: 1px; }
+      .help-section h4 { 
+        color: #fff; font-size: 1.3em; font-weight: 900; margin: 0 0 25px 0; 
+        display: flex; align-items: center; gap: 18px; letter-spacing: 1px; text-transform: uppercase;
+      }
+      .help-section ha-icon { 
+        color: var(--accent); background: rgba(247, 147, 26, 0.1); padding: 12px; 
+        border-radius: 16px; font-size: 1.4em; border: 1px solid rgba(247, 147, 26, 0.2);
+        box-shadow: inset 0 0 15px rgba(247, 147, 26, 0.05);
+      }
+      .help-section p { color: var(--text-dim); line-height: 1.8; font-size: 1em; margin-bottom: 25px; margin-top: 0; }
+      .help-section ul { padding-left: 0; color: var(--text-dim); list-style: none; margin: 0; display: flex; flex-direction: column; gap: 18px; flex: 1; }
+      .help-section li { font-size: 0.95em; line-height: 1.7; position: relative; padding-left: 24px; }
+      .help-section li::before { content: '•'; color: var(--accent); font-size: 2em; line-height: 0.7; position: absolute; left: 0; top: 2px; }
+      .help-section strong { color: #fff; font-weight: 700; letter-spacing: 0.5px; }
+      .help-footer { margin-top: 70px; text-align: center; }
+      .footer-line { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-border), transparent); margin-bottom: 30px; }
+      .help-footer p { font-size: 0.9em; color: var(--text-dim); font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
 
       @media (max-width: 1200px) {
         .dashboard-layout { grid-template-columns: 1fr; }
@@ -1343,10 +1351,14 @@ class HoymilesCYDPanel extends LitElement {
         /* Mobile Help & Tabs fixes */
         .tabs { padding: 6px; gap: 6px; }
         .tab { padding: 12px 10px; font-size: 0.75em; letter-spacing: 0; min-width: auto; }
-        .help-header h3 { font-size: 1.25em; letter-spacing: 1px; word-break: break-word; }
-        .help-header ha-icon { font-size: 1.5em; }
-        .help-section { padding: 25px 20px; }
-        .setup-title { font-size: 1.4em; }
+        .help-header { flex-direction: column; text-align: center; gap: 15px; margin-bottom: 30px; }
+        .help-header h3 { font-size: 1.4em; letter-spacing: 1px; word-break: break-word; line-height: 1.4; }
+        .help-header ha-icon { font-size: 2em; }
+        .help-section { padding: 30px 20px; }
+        .help-section::before { left: 20px; width: 40px; }
+        .help-section h4 { font-size: 1.1em; gap: 12px; margin-bottom: 20px; }
+        .help-section ha-icon { padding: 10px; font-size: 1.2em; }
+        .setup-title { font-size: 1.4em; line-height: 1.3; }
       }
 
       /* Sub Consumers Dashboard */
