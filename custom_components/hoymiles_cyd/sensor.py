@@ -1854,7 +1854,12 @@ class HoymilesZeroExportSensor(SensorEntity):
             "operation_mode": self._manager._config.get("operation_mode", "zero_export"),
             "is_enabled": self._manager.is_enabled,
             "hysteresis": getattr(self._manager, '_hysteresis', 5.0),
-            "grid_sensor_type": getattr(self._manager, '_grid_sensor_type', "net")
+            "grid_sensor_type": getattr(self._manager, '_grid_sensor_type', "net"),
+            "battery_protection_active": getattr(self._manager, '_battery_empty_mode', False),
+            "battery_min_soc": self._manager._config.get("battery_min_soc", 10),
+            "battery_restart_soc": self._manager._config.get("battery_restart_soc", 15),
+            "current_production_w": getattr(self._manager, '_last_current_production', 0.0),
+            "desired_production_w": getattr(self._manager, '_last_desired_production', 0.0)
         }
 
 
