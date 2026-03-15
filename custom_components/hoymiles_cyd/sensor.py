@@ -1869,7 +1869,6 @@ class HoymilesZeroExportLimitSensor(SensorEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "zero_export_limit"
     _attr_icon = "mdi:gauge"
-    _attr_native_unit_of_measurement = "%"
 
     def __init__(self, manager, entry):
         """Initialize."""
@@ -1882,6 +1881,14 @@ class HoymilesZeroExportLimitSensor(SensorEntity):
             "manufacturer": "Hoymiles CYD",
             "model": "Logic Module",
         }
+
+    @property
+    def native_unit_of_measurement(self):
+        """Return unit based on configuration."""
+        inv_type = self._manager._config.get("inverter_type", "hoymiles")
+        if inv_type != "hoymiles" and self._manager._config.get("generic_limit_type") == "watt":
+            return "W"
+        return "%"
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks."""

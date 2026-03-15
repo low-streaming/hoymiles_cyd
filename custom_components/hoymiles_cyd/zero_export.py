@@ -486,6 +486,8 @@ class ZeroExportManager:
                 final_watts = 0.0
             else:
                 final_percent = max(float(self._min_limit), min(float(self._max_limit), (desired_production / self._max_capacity) * 100))
+                if inv_type == "hoymiles":
+                    final_percent = min(100.0, final_percent)
                 min_watts = (float(self._min_limit) / 100.0) * float(self._max_capacity)
                 max_watts = (float(self._max_limit) / 100.0) * float(self._max_capacity)
                 final_watts = max(min_watts, min(max_watts, float(desired_production)))

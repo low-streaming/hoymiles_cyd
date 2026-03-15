@@ -506,7 +506,7 @@ class HoymilesCYDPanel extends LitElement {
             <div class="s-flex">
               <div class="s-icon orange"><ha-icon icon="mdi:target-variant"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Leistungslimit</span> <span>${control_limit}%</span></div>
+                <div class="s-row"><span>Leistungslimit</span> <span>${control_limit}${((this.config.inverter_type !== 'hoymiles' && this.config.generic_limit_type === 'watt') ? 'W' : '%')}</span></div>
                 <div class="s-row"><span>Effizienz</span> <span class="orange">OPTIMAL</span></div>
               </div>
             </div>
