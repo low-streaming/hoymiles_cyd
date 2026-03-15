@@ -302,10 +302,14 @@ class HoymilesCYDPanel extends LitElement {
       const raw_grid_p = getScaled(this.config.grid_sensor, this.config.grid_power_scale);
       if (this.config.grid_sensor_type === 'consumption') {
         house_consumption = raw_grid_p;
-        grid_p = Math.round(house_consumption - solar_p - (batt_p > 0 ? batt_p : 0), 0);
+        // Grid = House + Battery(Charging) - Battery(Discharge) - Solar
+        grid_p = Math.round(house_consumption + (batt_p || 0) - solar_p, 0);
       } else {
         grid_p = raw_grid_p;
-        house_consumption = Math.max(0, solar_p + grid_p + (batt_p > 0 ? 0 : Math.abs(batt_p)));
+        // House = Solar + Grid - Battery(Charging) + Battery(Discharge)
+        // Note: if batt_p is positive (charging), it subtracts from the apparent load to get appliances
+        // But usually, users want "House" to include everything. Let's make it consistent.
+        house_consumption = Math.max(0, solar_p + grid_p - (batt_p || 0));
       }
     }
 
@@ -322,6 +326,11 @@ class HoymilesCYDPanel extends LitElement {
 
     const gauge_deg = (parseFloat(control_limit) / 100) * 180;
 
+    const formatPower = (w) => {
+      if (Math.abs(w) >= 1000) return (w / 1000).toFixed(2) + ' kW';
+      return Math.round(w) + ' W';
+    };
+
     return html`
       <div class="dashboard-layout animate-fade-in">
         <div class="main-card glass">
@@ -331,11 +340,11 @@ class HoymilesCYDPanel extends LitElement {
             <div class="labels-top">
               <div class="box">
                 <span class="lab">Solar Produktion</span>
-                <span class="val neon-orange">${(solar_p / 1000).toFixed(2)} kW</span>
+                <span class="val neon-orange">${formatPower(solar_p)}</span>
               </div>
               <div class="box right">
                 <span class="lab">${this.config.operation_mode === 'base_load' ? 'Grundlast' : 'Haus Verbrauch'}</span>
-                <span class="val neon-blue">${(house_consumption / 1000).toFixed(2)} kW</span>
+                <span class="val neon-blue">${formatPower(house_consumption)}</span>
               </div>
             </div>
 
@@ -400,7 +409,7 @@ class HoymilesCYDPanel extends LitElement {
               <div class="node n-batt neon-border-green" style="top: 76.2%; left: 80%;">
                 <ha-icon icon="mdi:battery-high"></ha-icon>
                 ${battery_soc ? html`<div class="soc-tag neon-bg-green">${battery_soc}%</div>` : ''}
-                ${this.config.battery_power_sensor ? html`<div class="power-tag neon-bg-green">${batt_p > 0 ? '+' : ''}${batt_p.toFixed(0)}W</div>` : ''}
+                ${Math.abs(batt_p) > 1 ? html`<div class="power-tag neon-bg-green">${batt_p > 0 ? '⚡' : '⇣'} ${Math.abs(batt_p).toFixed(0)}W</div>` : ''}
               </div>
 
               <!-- Sub Consumers Area -->
@@ -957,6 +966,16 @@ class HoymilesCYDPanel extends LitElement {
               <li><strong>Limit wird nicht gesetzt:</strong> Prüfe, ob die "External Limit Entity" korrekt beschreibbar / erreichbar ist.</li>
               <li><strong>0W statt Limit:</strong> Kontrolliere deine % und Watt Mapping Einstellungen (Watt vs. Prozent Limits).</li>
             </ul>
+          </div>
+
+          <div class="help-section">
+            <h4><ha-icon icon="mdi:calculator"></ha-icon> 7. VERBRAUCHS-BERECHNUNG</h4>
+            <p>Es gibt zwei Arten, wie der Hausverbrauch berechnet wird:</p>
+            <ul>
+              <li><strong>Netz-Zähler (Standard):</strong> Sensor zeigt Import(+) / Export(-). <br/><em>Kalkulation: Haus = Netz + Solar - Batterie.</em></li>
+              <li><strong>Haus-Verbrauch (Consumer):</strong> Sensor misst direkt die Last der Geräte (immer positiv). <br/><em>Kalkulation: Netz-Zähler = Haus + Batterie - Solar.</em></li>
+            </ul>
+            <p>Falls dein Hausverbrauch im Dashboard falsch ist (z.B. Solar wird doppelt gezählt), prüfe diese Einstellung unter SENSOR-ZÄHLER-TYP!</p>
           </div>
         </div>
 
