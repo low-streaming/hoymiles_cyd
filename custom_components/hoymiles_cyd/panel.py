@@ -96,7 +96,8 @@ class HoymilesCYDConfigView(HomeAssistantView):
                 "max_limit": 100,
                 "is_enabled": False,
                 "operation_mode": "zero_export",
-                "selected_inverter": "all"
+                "selected_inverter": "all",
+                "zero_export_interval": 10
             }
 
         config = await hass.async_add_executor_job(read_config)

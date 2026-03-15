@@ -41,6 +41,7 @@ class ZeroExportManager:
         self._unsub_sub = None
         self._unsub_batt = None
         self._hysteresis = 5.0
+        self._zero_export_interval = 10.0
         self._grid_sensor_type = "net"
         self._battery_empty_mode = False
         self._config = {}
@@ -173,24 +174,28 @@ class ZeroExportManager:
             self._min_limit = float(config.get("min_limit", self._min_limit))
             self._max_limit = float(config.get("max_limit", self._max_limit))
             self._hysteresis = float(config.get("zero_export_hysteresis", 5.0))
+            self._zero_export_interval = float(config.get("zero_export_interval", 10.0))
             self._grid_sensor_type = config.get("grid_sensor_type", "net")
 
         self._update_tracker()
 
     def _update_tracker(self):
         """Update sensor trackers based on mode and state."""
-        if getattr(self, '_unsub', None) and callable(self._unsub):
-            try: self._unsub()
+        u = getattr(self, '_unsub', None)
+        if u and callable(u):
+            try: u()
             except Exception: pass
             self._unsub = None
             
-        if getattr(self, '_unsub_batt', None) and callable(self._unsub_batt):
-            try: self._unsub_batt()
+        ub = getattr(self, '_unsub_batt', None)
+        if ub and callable(ub):
+            try: ub()
             except Exception: pass
             self._unsub_batt = None
             
-        if getattr(self, '_unsub_sub', None) and callable(self._unsub_sub):
-            try: self._unsub_sub()
+        us = getattr(self, '_unsub_sub', None)
+        if us and callable(us):
+            try: us()
             except Exception: pass
             self._unsub_sub = None
             
@@ -250,14 +255,19 @@ class ZeroExportManager:
 
     def stop(self):
         """Stop the zero export logic."""
-        if self._unsub:
-            self._unsub()
+        if self._unsub and callable(self._unsub):
+            try: self._unsub()
+            except Exception: pass
             self._unsub = None
-        if self._unsub_batt:
-            self._unsub_batt()
+            
+        if self._unsub_batt and callable(self._unsub_batt):
+            try: self._unsub_batt()
+            except Exception: pass
             self._unsub_batt = None
-        if self._unsub_sub:
-            self._unsub_sub()
+            
+        if self._unsub_sub and callable(self._unsub_sub):
+            try: self._unsub_sub()
+            except Exception: pass
             self._unsub_sub = None
 
     def update_config(self, config: dict):
@@ -275,6 +285,7 @@ class ZeroExportManager:
         self._max_limit = float(config.get("max_limit", self._max_limit))
         self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
         self._hysteresis = float(config.get("zero_export_hysteresis", 5.0))
+        self._zero_export_interval = float(config.get("zero_export_interval", 10.0))
         self._grid_sensor_type = config.get("grid_sensor_type", "net")
         
         self._update_tracker()
@@ -423,9 +434,10 @@ class ZeroExportManager:
         import time
         now = time.time()
         
-        # Cooldown: only allow updates every 20 seconds to prevent oscillation
+        # Cooldown: only allow updates every X seconds to prevent oscillation
+        interval = getattr(self, '_zero_export_interval', 10.0)
         last_exec = float(getattr(self, '_last_execution_time', 0.0))
-        if self._is_updating or (now - last_exec < 20 and not self._battery_empty_mode):
+        if self._is_updating or (now - last_exec < interval and not self._battery_empty_mode):
             return
             
         self._is_updating = True
@@ -498,7 +510,8 @@ class ZeroExportManager:
                 jitter_threshold = max(0.2, (self._hysteresis / self._max_capacity) * 100)
             
             # Avoid small jitter
-            if self._last_limit is None or abs(self._last_limit - current_target) >= jitter_threshold:
+            last_limit_val = self._last_limit
+            if last_limit_val is None or abs(float(last_limit_val) - current_target) >= jitter_threshold:
                 if inv_type == "hoymiles" and dtu:
                     target_inverter = self._config.get("selected_inverter", "all")
                     _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {final_percent}% (Watts: {final_watts}W, Target: {target_inverter})")

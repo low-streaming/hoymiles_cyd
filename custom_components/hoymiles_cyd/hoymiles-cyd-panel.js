@@ -168,6 +168,7 @@ class HoymilesCYDPanel extends LitElement {
       inverter_type: 'hoymiles',
       generic_limit_type: 'watt',
       zero_export_hysteresis: 5,
+      zero_export_interval: 10,
       grid_sensor_type: 'net',
       sub_consumer_1_name: '', sub_consumer_1_sensor: '', sub_consumer_1_icon: 'mdi:power-plug', sub_consumer_1_toggle: '', sub_consumer_1_use_as_load: false,
       sub_consumer_2_name: '', sub_consumer_2_sensor: '', sub_consumer_2_icon: 'mdi:power-plug', sub_consumer_2_toggle: '', sub_consumer_2_use_as_load: false,
@@ -672,6 +673,18 @@ class HoymilesCYDPanel extends LitElement {
                     <input type="number" class="cfg-num" .value="${this.config.zero_export_hysteresis || 5}"
                       @change="${(e) => this.config = { ...this.config, zero_export_hysteresis: e.target.value }}">
                     <span class="unit-tag">W</span>
+                 </div>
+              </div>
+
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Regel-Intervall</div>
+                    <div class="cfg-desc">Wartezeit zwischen zwei Befehlen in Sekunden (z.B. 10s).</div>
+                 </div>
+                 <div class="input-wrap">
+                    <input type="number" class="cfg-num" .value="${this.config.zero_export_interval || 10}"
+                      @change="${(e) => this.config = { ...this.config, zero_export_interval: e.target.value }}">
+                    <span class="unit-tag">s</span>
                  </div>
               </div>
             </div>
