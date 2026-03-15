@@ -42,6 +42,8 @@ class ZeroExportManager:
         self._battery_empty_mode = False
         self._unsub_batt = None
         self._unsub_sub = None
+        self._hysteresis = 5.0
+        self._grid_sensor_type = "net"
 
     def add_state_change_callback(self, callback_func):
         """Add callback for state changes."""
@@ -165,6 +167,8 @@ class ZeroExportManager:
             self._max_capacity = float(config.get("max_capacity", self._max_capacity))
             self._min_limit = float(config.get("min_limit", self._min_limit))
             self._max_limit = float(config.get("max_limit", self._max_limit))
+            self._hysteresis = float(config.get("zero_export_hysteresis", 5.0))
+            self._grid_sensor_type = config.get("grid_sensor_type", "net")
 
         self._update_tracker()
 
@@ -262,6 +266,8 @@ class ZeroExportManager:
         self._min_limit = float(config.get("min_limit", self._min_limit))
         self._max_limit = float(config.get("max_limit", self._max_limit))
         self._grid_sensor = config.get("grid_sensor", self._grid_sensor)
+        self._hysteresis = float(config.get("zero_export_hysteresis", 5.0))
+        self._grid_sensor_type = config.get("grid_sensor_type", "net")
         
         self._update_tracker()
 
@@ -346,8 +352,17 @@ class ZeroExportManager:
         # Get current production (W)
         current_production = self._get_current_production()
         
-        # Desired Production = Current + Grid - Target
-        desired_production = current_production + grid_power - self._target_watt
+        # Calculate desired production based on sensor type
+        if self._grid_sensor_type == "consumption":
+            # Grid sensor already represents house load
+            desired_production = grid_power - self._target_watt
+            _LOGGER.debug(f"Zero Export (Consumption Mode): Grid/Load = {grid_power}W, Target = {self._target_watt}W, Desired = {desired_production}W")
+        else:
+            # Grid sensor is Net (Import/Export)
+            # Desired Production = Current + Grid - Target
+            desired_production = current_production + grid_power - self._target_watt
+            _LOGGER.debug(f"Zero Export (Net Mode): Current = {current_production}W, Grid = {grid_power}W, Target = {self._target_watt}W, Desired = {desired_production}W")
+            
         await self._apply_production_limit(desired_production)
 
     def _get_current_production(self) -> float:
@@ -443,8 +458,14 @@ class ZeroExportManager:
 
             limit_unit = self._config.get("generic_limit_type", "percent") if inv_type != "hoymiles" else "percent"
             current_target = final_watts if limit_unit == "watt" else final_percent
-            jitter_threshold = 5 if limit_unit == "watt" else 0.5
-
+            
+            # Use configurable hysteresis (if in Watt mode, use W, else convert W to %)
+            if limit_unit == "watt":
+                jitter_threshold = self._hysteresis
+            else:
+                # Convert W hysteresis to % (approximate)
+                jitter_threshold = max(0.2, (self._hysteresis / self._max_capacity) * 100)
+            
             # Avoid small jitter
             if self._last_limit is None or abs(self._last_limit - current_target) >= jitter_threshold:
                 if inv_type == "hoymiles" and dtu:

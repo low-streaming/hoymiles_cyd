@@ -23,6 +23,8 @@ CONF_GRID_SENSOR = "grid_sensor"
 CONF_ZERO_EXPORT_TARGET = "zero_export_target"
 CONF_ZERO_EXPORT_MIN_LIMIT = "zero_export_min_limit"
 CONF_ZERO_EXPORT_MAX_LIMIT = "zero_export_max_limit"
+CONF_GRID_SENSOR_TYPE = "grid_sensor_type"
+CONF_ZERO_EXPORT_HYSTERESIS = "zero_export_hysteresis"
 CONF_MAX_CAPACITY = "max_capacity"
 CONF_USE_GENERIC = "use_generic"
 

@@ -167,6 +167,8 @@ class HoymilesCYDPanel extends LitElement {
       external_limit_entity: '',
       inverter_type: 'hoymiles',
       generic_limit_type: 'watt',
+      zero_export_hysteresis: 5,
+      grid_sensor_type: 'net',
       sub_consumer_1_name: '', sub_consumer_1_sensor: '', sub_consumer_1_icon: 'mdi:power-plug', sub_consumer_1_toggle: '', sub_consumer_1_use_as_load: false,
       sub_consumer_2_name: '', sub_consumer_2_sensor: '', sub_consumer_2_icon: 'mdi:power-plug', sub_consumer_2_toggle: '', sub_consumer_2_use_as_load: false,
       sub_consumer_3_name: '', sub_consumer_3_sensor: '', sub_consumer_3_icon: 'mdi:power-plug', sub_consumer_3_toggle: '', sub_consumer_3_use_as_load: false,
@@ -297,8 +299,14 @@ class HoymilesCYDPanel extends LitElement {
       house_consumption = bl_power;
       grid_p = house_consumption - solar_p; // Simulate grid exchange based on base load calculation
     } else {
-      grid_p = getScaled(this.config.grid_sensor, this.config.grid_power_scale);
-      house_consumption = Math.max(0, solar_p + grid_p + (batt_p > 0 ? 0 : Math.abs(batt_p)));
+      const raw_grid_p = getScaled(this.config.grid_sensor, this.config.grid_power_scale);
+      if (this.config.grid_sensor_type === 'consumption') {
+        house_consumption = raw_grid_p;
+        grid_p = Math.round(house_consumption - solar_p - (batt_p > 0 ? batt_p : 0), 0);
+      } else {
+        grid_p = raw_grid_p;
+        house_consumption = Math.max(0, solar_p + grid_p + (batt_p > 0 ? 0 : Math.abs(batt_p)));
+      }
     }
 
     // Energy (kWh)
@@ -642,10 +650,22 @@ class HoymilesCYDPanel extends LitElement {
                 <div class="input-wrap">
                    <input type="number" class="cfg-num" .value="${this.config.max_limit || 100}"
                      @change="${(e) => this.config = { ...this.config, max_limit: e.target.value }}">
-                   <span class="unit-tag">%</span>
-                </div>
-             </div>
-           </div>
+                    <span class="unit-tag">%</span>
+                 </div>
+              </div>
+
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Hysterese (Regel-Schwelle)</div>
+                    <div class="cfg-desc">Leistungsdifferenz in Watt, ab der erst geregelt wird (Regler-Schonung).</div>
+                 </div>
+                 <div class="input-wrap">
+                    <input type="number" class="cfg-num" .value="${this.config.zero_export_hysteresis || 5}"
+                      @change="${(e) => this.config = { ...this.config, zero_export_hysteresis: e.target.value }}">
+                    <span class="unit-tag">W</span>
+                 </div>
+              </div>
+            </div>
 
            <!-- BATTERIESCHUTZ -->
            <div class="config-section glass" style="display: flex; flex-direction: column;">
@@ -725,12 +745,19 @@ class HoymilesCYDPanel extends LitElement {
                 </div>
                 <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.grid_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, grid_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="u-sel">
-                   <select @change="${(e) => this.config = { ...this.config, grid_power_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">Daten sind in Watt</option>
-                      <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">Eingang ist kW -> zu W</option>
-                   </select>
-                </div>
+                          <div class="u-sel">
+                    <select @change="${(e) => this.config = { ...this.config, grid_power_scale: e.target.value }}">
+                       <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">Daten sind in Watt</option>
+                       <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">Eingang ist kW -> zu W</option>
+                    </select>
+                 </div>
+                 <div class="u-sel" style="margin-top: 10px;">
+                    <label style="display: block; font-size: 0.7em; color: var(--text-dim); margin-bottom: 5px; font-weight: bold;">ZÄHLER-INTERPRETATION:</label>
+                    <select @change="${(e) => this.config = { ...this.config, grid_sensor_type: e.target.value }}">
+                       <option value="net" ?selected="${this.config.grid_sensor_type === 'net'}">Netz-Zähler (Import +, Export -)</option>
+                       <option value="consumption" ?selected="${this.config.grid_sensor_type === 'consumption'}">Haus-Verbrauch (Immer +)</option>
+                    </select>
+                 </div>
               </div>
 
               <div class="p-card">
