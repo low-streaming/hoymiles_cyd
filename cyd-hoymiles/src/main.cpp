@@ -269,25 +269,18 @@ void checkForUpdate() {
 }
 
 String discover_ha_ip() {
-  Serial.println("Searching for Home Assistant via mDNS (_home-assistant._tcp)...");
-  int n = MDNS.queryService("home-assistant", "tcp");
-  if (n > 0) {
-    String found_ip = MDNS.IP(0).toString();
-    Serial.print("Found HA at: ");
-    Serial.println(found_ip);
-    return found_ip;
-  }
+  Serial.println("Suche Home Assistant via mDNS (homeassistant.local)...");
   
-  // Try resolving homeassistant.local directly
-  Serial.println("Trying to resolve homeassistant.local...");
-  IPAddress srv;
-  if (WiFi.hostByName("homeassistant.local", srv)) {
-    Serial.print("Resolved homeassistant.local to: ");
+  // Direkte Host-Abfrage ist im neuen ESP32 Core 3.x am stabilsten
+  IPAddress srv = MDNS.queryHost("homeassistant");
+  
+  if (srv != IPAddress(0,0,0,0)) {
+    Serial.print("Home Assistant gefunden: ");
     Serial.println(srv.toString());
     return srv.toString();
   }
 
-  Serial.println("HA not found via mDNS.");
+  Serial.println("Home Assistant konnte nicht via mDNS gefunden werden.");
   return "";
 }
 
