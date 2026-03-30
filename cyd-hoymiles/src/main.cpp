@@ -31,6 +31,7 @@ int bat_soc = 0;
 String status_text = "Stabil";
 bool is_offline = true;
 uint32_t last_update = 0;
+bool needs_display_update = false; // Set by fetch/OTA, consumed in loop()
 
 void saveConfigCallback() {
   Serial.println("Should save config");
@@ -311,7 +312,10 @@ void checkForUpdate() {
     }
   }
   http.end();
-  display_update();
+  // Do NOT call display_update() here — the large stack frame from
+  // WiFiClientSecure/HTTPClient is still live and would cause a stack overflow.
+  // Instead, signal loop() to call it after this frame is cleaned up.
+  needs_display_update = true;
 }
 
 String discover_ha_ip() {
@@ -437,7 +441,9 @@ void fetch_ha_data() {
     if (httpCode == 401)
       Serial.println("Error: Unauthorized! Please provide a Token.");
   }
-  display_update();
+  // Stack frame still holds WiFiClient + HTTPClient + JsonDocument.
+  // Signal loop() to call display_update() once we've returned.
+  needs_display_update = true;
 }
 
 void setup() {
@@ -464,6 +470,12 @@ void loop() {
   if (millis() - last_update > 2000) {
     last_update = millis();
     fetch_ha_data();
+  }
+  // display_update() is called here (not inside fetch_ha_data) so the
+  // large HTTP objects are off the stack before we enter the TFT rendering.
+  if (needs_display_update) {
+    needs_display_update = false;
+    display_update();
   }
   delay(100);
 }

@@ -78,14 +78,50 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> FlowResult:
-        """Handle zeroconf discovery."""
+        """Handle zeroconf discovery of a CYD display."""
         host = discovery_info.host
-        
-        # Check if already configured
+        name = discovery_info.name or f"Hoymiles CYD @ {host}"
+
+        # Avoid duplicate entries
         await self.async_set_unique_id(f"cyd_{host}")
         self._abort_if_unique_id_configured()
-        
-        return await self.async_step_user({CONF_HOST: host})
+
+        self.context["title_placeholders"] = {"name": name, "host": host}
+        self._discovered_host = host
+        self._discovered_name = name
+        return await self.async_step_zeroconf_confirm()
+
+    async def async_step_zeroconf_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm discovery of CYD display."""
+        if user_input is not None:
+            host = self._discovered_host
+            return self.async_create_entry(
+                title=self._discovered_name,
+                data={
+                    CONF_HOST: host,
+                    CONF_UPDATE_INTERVAL: DEFAULT_UPDATE_INTERVAL_SECONDS,
+                    CONF_DTU_SERIAL_NUMBER: f"cyd_{host}",
+                    CONF_INVERTERS: [],
+                    CONF_THREE_PHASE_INVERTERS: [],
+                    CONF_PORTS: [],
+                    CONF_METERS: [],
+                    CONF_HYBRID_INVERTERS: [],
+                    CONF_IS_ENCRYPTED: False,
+                    CONF_ENC_RAND: "",
+                    CONF_TIMEOUT: DEFAULT_TIMEOUT_SECONDS,
+                    CONF_USE_GENERIC: True,
+                },
+            )
+
+        return self.async_show_form(
+            step_id="zeroconf_confirm",
+            description_placeholders={
+                "name": self._discovered_name,
+                "host": self._discovered_host,
+            },
+        )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
