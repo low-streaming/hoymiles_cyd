@@ -295,9 +295,9 @@ void checkForUpdate() {
                         httpUpdate.getLastErrorString().c_str());
           tft.setCursor(40, 200);
           tft.setTextColor(TFT_RED);
-          tft.println("Update Failed!");
-          delay(5000);
-          break;
+          tft.println("Update Failed! Restarting...");
+          delay(3000);
+          ESP.restart(); // Heap is corrupted after failed OTA — must restart
         case HTTP_UPDATE_NO_UPDATES:
           Serial.println("HTTP_UPDATE_NO_UPDATES");
           break;
