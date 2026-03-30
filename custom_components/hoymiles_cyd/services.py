@@ -10,10 +10,72 @@ from homeassistant.helpers.device_registry import async_get as async_get_device_
 from hoymiles_wifi.utils import parse_time_periods_input, parse_time_settings_input
 
 import logging
-
-from .const import CONF_DTU_SERIAL_NUMBER
+import os
+import shutil
+import zipfile
+import io
+import aiohttp
+from .const import CONF_DTU_SERIAL_NUMBER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def async_handle_update_integration(call: ServiceCall):
+    """Update the integration from GitHub."""
+    hass = call.hass
+    repo_url = "https://github.com/low-streaming/hoymiles_cyd/archive/refs/heads/main.zip"
+    
+    _LOGGER.info("Starting Hoymiles CYD integration update from %s", repo_url)
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(repo_url) as response:
+                if response.status != 200:
+                    _LOGGER.error("Failed to download update, status: %s", response.status)
+                    return
+                content = await response.read()
+
+        # Unzip
+        with zipfile.ZipFile(io.BytesIO(content)) as zip_ref:
+            # We assume the zip has a top level folder like hoymiles_cyd-main
+            # and inside it is custom_components/hoymiles_cyd
+            
+            extract_path = hass.config.path("hoymiles_cyd_update_temp")
+            if os.path.exists(extract_path):
+                shutil.rmtree(extract_path)
+            os.makedirs(extract_path)
+            
+            zip_ref.extractall(extract_path)
+            
+            # Find the component folder
+            top_dir = os.listdir(extract_path)[0]
+            src_component_path = os.path.join(extract_path, top_dir, "custom_components", "hoymiles_cyd")
+            dest_component_path = os.path.join(hass.config.config_dir, "custom_components", "hoymiles_cyd")
+            
+            if not os.path.exists(src_component_path):
+                 _LOGGER.error("Could not find component folder in update ZIP")
+                 return
+
+            _LOGGER.info("Cleaning up and replacing files at %s", dest_component_path)
+            # Replace files
+            if os.path.exists(dest_component_path):
+                # Don't delete the whole folder to avoid potential lock issues, just overwrite files
+                # Wait, actually for custom_components, deleting and moving is usually cleaner
+                shutil.rmtree(dest_component_path)
+            
+            shutil.copytree(src_component_path, dest_component_path)
+            
+            # Cleanup temp
+            shutil.rmtree(extract_path)
+            
+            _LOGGER.info("Hoymiles CYD Update successful! Please restart Home Assistant.")
+            
+            # Fire event so frontend knows we are done
+            hass.bus.async_fire("hoymiles_cyd_update_completed", {"status": "success"})
+
+    except Exception as e:
+        _LOGGER.error("Error during Hoymiles CYD update: %s", e)
+        hass.bus.async_fire("hoymiles_cyd_update_completed", {"status": "error", "message": str(e)})
 
 
 async def async_handle_set_bms_mode(call: ServiceCall):

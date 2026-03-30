@@ -143,13 +143,21 @@ class HoymilesCYDPanel extends LitElement {
       activeTab: { type: String },
       config: { type: Object },
       _historyData: { type: Array },
-      _availableInverters: { type: Array }
+      _availableInverters: { type: Array },
+      _latestVersion: { type: String },
+      _currentVersion: { type: String },
+      _isUpdating: { type: Boolean },
+      _updateStatus: { type: String }
     };
   }
 
   constructor() {
     super();
     this.activeTab = 'dashboard';
+    this._latestVersion = '';
+    this._currentVersion = '';
+    this._isUpdating = false;
+    this._updateStatus = '';
     this.config = {
       grid_sensor: '',
       grid_energy_import_sensor: '',
@@ -188,12 +196,56 @@ class HoymilesCYDPanel extends LitElement {
       this._loadInverters();
       this._configLoaded = true;
       this._fetchHistory();
+      this._checkUpdate();
       setInterval(() => this._fetchHistory(), 60000);
 
       this.addEventListener('click', () => {
         const pickers = this.shadowRoot.querySelectorAll('hoymiles-entity-picker');
         pickers.forEach(p => p.open = false);
       });
+
+      // Listen for update events via HA Connection
+      if (this.hass.connection) {
+        this._updateEventUnsub = this.hass.connection.subscribeEvents((event) => {
+          this._isUpdating = false;
+          this._updateStatus = event.data.status === 'success' ? 'Update erfolgreich! Bitte HA neu starten.' : 'Fehler: ' + event.data.message;
+          this.requestUpdate();
+        }, 'hoymiles_cyd_update_completed');
+      }
+    }
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._updateEventUnsub) {
+      this._updateEventUnsub();
+    }
+  }
+
+  async _checkUpdate() {
+    try {
+      // Get local version from our sync API
+      const syncResp = await this.hass.callApi('GET', 'hoymiles_cyd_sync');
+      this._currentVersion = syncResp.version || 'v1.1.1';
+
+      // Get latest version from GitHub
+      const gitResp = await fetch('https://raw.githubusercontent.com/low-streaming/hoymiles_cyd/main/custom_components/hoymiles_cyd/manifest.json');
+      const gitManifest = await gitResp.json();
+      this._latestVersion = gitManifest.version;
+    } catch (e) {
+      console.error("Update check failed", e);
+    }
+  }
+
+  async _runUpdate() {
+    if (!confirm("Möchtest du das Update jetzt installieren? Die Integration wird dabei überschrieben.")) return;
+    this._isUpdating = true;
+    this._updateStatus = 'Downloading & Installing...';
+    try {
+      await this.hass.callService('hoymiles_cyd', 'update_integration', {});
+    } catch (e) {
+      this._isUpdating = false;
+      this._updateStatus = 'Fehler beim Starten des Updates.';
     }
   }
 
@@ -1000,13 +1052,41 @@ class HoymilesCYDPanel extends LitElement {
           </div>
 
           <div class="help-section">
-            <h4><ha-icon icon="mdi:calculator"></ha-icon> 7. VERBRAUCHS-BERECHNUNG</h4>
-            <p>Es gibt zwei Arten, wie der Hausverbrauch berechnet wird:</p>
-            <ul>
-              <li><strong>Netz-Zähler (Standard):</strong> Sensor zeigt Import(+) / Export(-). <br/><em>Kalkulation: Haus = Netz + Solar - Batterie.</em></li>
-              <li><strong>Haus-Verbrauch (Consumer):</strong> Sensor misst direkt die Last der Geräte (immer positiv). <br/><em>Kalkulation: Netz-Zähler = Haus + Batterie - Solar.</em></li>
-            </ul>
-            <p>Falls dein Hausverbrauch im Dashboard falsch ist (z.B. Solar wird doppelt gezählt), prüfe diese Einstellung unter SENSOR-ZÄHLER-TYP!</p>
+            <h4><ha-icon icon="mdi:update"></ha-icon> 8. SYSTEM & UPDATE</h4>
+            <div class="glass-card" style="padding: 20px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div>
+                        <div style="font-size: 0.9em; color: var(--text-dim);">Aktuelle Version</div>
+                        <div style="font-size: 1.2em; font-weight: 700; color: #fff;">v${this._currentVersion}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.9em; color: var(--text-dim);">Latest GitHub</div>
+                        <div style="font-size: 1.2em; font-weight: 700; color: var(--accent);">v${this._latestVersion || '...'}</div>
+                    </div>
+                </div>
+
+                ${this._latestVersion && this._latestVersion !== this._currentVersion ? html`
+                    <div style="background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); padding: 15px; border-radius: 12px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px;">
+                        <ha-icon icon="mdi:alert-decagram" style="color: var(--neon-green);"></ha-icon>
+                        <div style="flex: 1; font-size: 0.9em;">Ein neues Update ist auf GitHub verfügbar!</div>
+                    </div>
+                    <button class="mega-save-btn" style="background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);" 
+                        ?disabled="${this._isUpdating}"
+                        @click="${this._runUpdate}">
+                        ${this._isUpdating ? html`<ha-circular-progress active size="small"></ha-circular-progress>` : 'Update jetzt installieren'}
+                    </button>
+                ` : html`
+                    <div style="text-align: center; color: var(--text-dim); font-size: 0.85em; padding: 10px;">
+                        <ha-icon icon="mdi:check-circle" style="color: var(--neon-green); margin-right: 5px;"></ha-icon> Deine Version ist aktuell.
+                    </div>
+                `}
+                
+                ${this._updateStatus ? html`
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 8px; font-size: 0.85em; text-align: center; color: var(--accent);">
+                        ${this._updateStatus}
+                    </div>
+                ` : ''}
+            </div>
           </div>
         </div>
 

@@ -208,12 +208,23 @@ class HoymilesCYDSyncView(HomeAssistantView):
         if manager:
             ze_status = getattr(manager, "status", "Unbekannt")
 
+        # Get current version from manifest
+        version = "unknown"
+        try:
+            manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
+            with open(manifest_path, "r") as f:
+                manifest_data = json.load(f)
+                version = manifest_data.get("version", "unknown")
+        except Exception:
+            pass
+
         import time
         data = {
             "solar": {"p": solar_p, "y": solar_y, "u_p": config.get("solar_power_unit", "W"), "u_y": config.get("solar_yield_unit", "kWh")},
             "grid": {"p": grid_p, "imp": grid_import, "exp": grid_export, "u_p": config.get("grid_power_unit", "W"), "u_e": config.get("grid_energy_unit", "kWh")},
             "bat": {"p": bat_p, "soc": bat_soc, "u_p": config.get("battery_power_unit", "W")},
             "status": ze_status,
+            "version": version,
             "ts": int(time.time())
         }
 

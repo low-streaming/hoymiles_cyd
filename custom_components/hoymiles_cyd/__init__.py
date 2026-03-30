@@ -44,7 +44,7 @@ from .coordinator import (
     HoymilesEnergyStorageUpdateCoordinator,
 )
 from .error import CannotConnect
-from .services import async_handle_set_bms_mode
+from .services import async_handle_set_bms_mode, async_handle_update_integration
 from .util import async_get_config_entry_data_for_host
 from .zero_export import ZeroExportManager
 from .panel import async_setup_panel
@@ -187,6 +187,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
             supports_response=SupportsResponse.NONE,
         )
         _LOGGER.debug("Service set_bms_mode registered")
+
+    hass.services.async_register(
+        domain=DOMAIN,
+        service="update_integration",
+        service_func=async_handle_update_integration,
+    )
+    _LOGGER.info("Service hoymiles_cyd.update_integration registered")
 
     return True
 

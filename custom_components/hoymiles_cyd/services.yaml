@@ -61,3 +61,8 @@ set_bms_mode:
       example: "06:00-08:00-50-90|18:00-20:00-40-20"
       selector:
         text:
+
+update_integration:
+  name: Update Integration
+  description: Downloads and installs the latest version of the Hoymiles CYD integration from GitHub. Requires a Home Assistant restart afterwards.
+  fields: {}
