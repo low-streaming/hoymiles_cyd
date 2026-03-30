@@ -221,9 +221,13 @@ class HoymilesCYDPanel extends LitElement {
     this._configLoaded = true;
     this._fetchHistory();
     this._checkUpdate();
+    this._fetchDisplays(); // Initial fetch of connected displays
     
     if (this._historyInterval) clearInterval(this._historyInterval);
     this._historyInterval = setInterval(() => this._fetchHistory(), 60000);
+
+    // Refresh display list every 10 seconds
+    setInterval(() => this._fetchDisplays(), 10000);
 
     // Listen for update events via HA Connection
     if (this.hass.connection && !this._updateEventUnsub) {

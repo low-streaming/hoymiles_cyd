@@ -32,6 +32,7 @@ String status_text = "Stabil";
 bool is_offline = true;
 uint32_t last_update = 0;
 bool needs_display_update = false; // Set by fetch/OTA, consumed in loop()
+bool pending_ota = false;          // Triggered by HA, consumed in loop()
 
 void saveConfigCallback() {
   Serial.println("Should save config");
@@ -383,13 +384,13 @@ void fetch_ha_data() {
   Serial.print("Target URL: ");
   Serial.println(url);
 
-  HTTPClient http;
   int httpCode = -1;
   String payload = "";
 
   if (url.startsWith("https")) {
     WiFiClientSecure client_secure;
     client_secure.setInsecure();
+    HTTPClient http;
     http.begin(client_secure, url);
     if (strlen(ha_token) > 5) {
       http.addHeader("Authorization", "Bearer " + String(ha_token));
@@ -399,6 +400,7 @@ void fetch_ha_data() {
     http.end();
   } else {
     WiFiClient client;
+    HTTPClient http;
     http.begin(client, url);
     if (strlen(ha_token) > 5) {
       http.addHeader("Authorization", "Bearer " + String(ha_token));
@@ -426,7 +428,7 @@ void fetch_ha_data() {
       
       if (doc["update"]) {
         Serial.println("Update trigger from Home Assistant!");
-        checkForUpdate();
+        pending_ota = true; 
       }
       Serial.println("Sync: SUCCESS");
     } else {
@@ -441,8 +443,7 @@ void fetch_ha_data() {
     if (httpCode == 401)
       Serial.println("Error: Unauthorized! Please provide a Token.");
   }
-  // Stack frame still holds WiFiClient + HTTPClient + JsonDocument.
-  // Signal loop() to call display_update() once we've returned.
+  
   needs_display_update = true;
 }
 
@@ -462,7 +463,6 @@ void setup() {
     MDNS.addServiceTxt("hoymiles-cyd", "tcp", "version", CURRENT_VERSION);
   }
 
-  checkForUpdate();
   fetch_ha_data();
 }
 
@@ -476,6 +476,11 @@ void loop() {
   if (needs_display_update) {
     needs_display_update = false;
     display_update();
+  }
+
+  if (pending_ota) {
+    pending_ota = false;
+    checkForUpdate();
   }
   delay(100);
 }
