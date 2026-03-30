@@ -1077,50 +1077,50 @@ class HoymilesCYDPanel extends LitElement {
     
     return html`
       <div class="dashboard-layout animate-fade-in">
-        <div class="main-card glass" style="max-width: 800px; margin: 0 auto;">
-          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-            <ha-icon icon="mdi:cellphone-link-centralized" style="font-size: 2.4em; color: var(--accent);"></ha-icon>
+        <div class="main-card glass" style="max-width: 900px; margin: 0 auto; padding: 30px;">
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 20px;">
+            <ha-icon icon="mdi:cellphone-link-centralized" style="font-size: 2em; color: var(--accent);"></ha-icon>
             <div>
-              <h2 style="margin: 0; font-size: 1.5em; font-weight: 800; letter-spacing: 1px;">DISPLAY FIRMWARE UPDATES</h2>
-              <p style="margin: 5px 0 0; font-size: 0.85em; color: var(--text-dim);">Hier siehst du alle verbundenen CYD Solar Displays und kannst gezielt Updates anstoßen.</p>
+              <h2 style="margin: 0; font-size: 1.25em; font-weight: 800; letter-spacing: 1px;">DISPLAY FIRMWARE</h2>
+              <p style="margin: 3px 0 0; font-size: 0.8em; color: var(--text-dim);">Aktive CYD Solar Displays im Netzwerk.</p>
             </div>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 15px;">
             ${displays.length === 0 ? html`
-              <div style="text-align: center; padding: 40px; color: var(--text-dim);">
-                <ha-icon icon="mdi:wifi-off" style="font-size: 3em; opacity: 0.3; margin-bottom: 10px;"></ha-icon>
-                <p>Keine aktiven Displays im Netzwerk gefunden.<br/><small>Stelle sicher, dass dein CYD eingeschaltet und mit WLAN verbunden ist.</small></p>
+              <div style="text-align: center; padding: 60px 20px; color: var(--text-dim); background: rgba(0,0,0,0.1); border-radius: 20px; border: 1px dashed rgba(255,255,255,0.1);">
+                <ha-icon icon="mdi:wifi-off" style="font-size: 2.5em; opacity: 0.3; margin-bottom: 15px;"></ha-icon>
+                <p style="margin: 0;">Keine aktiven Displays gefunden.<br/><small style="opacity: 0.6;">Stelle sicher, dass dein CYD eingeschaltet ist.</small></p>
               </div>
             ` : displays.map(([ip, data]) => {
               const isUpToDate = data.version === this._latestVersion;
               return html`
-                <div class="glass-card" style="padding: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid ${isUpToDate ? 'rgba(57,255,20,0.1)' : 'var(--accent)'}; background: rgba(0,0,0,0.3);">
-                  <div style="background: var(--glass-bg); padding: 12px; border-radius: 12px;">
-                    <ha-icon icon="mdi:cellphone-wireless" style="color: ${isUpToDate ? 'var(--neon-green)' : 'var(--accent)'};"></ha-icon>
+                <div class="glass-card" style="padding: 15px 20px; display: flex; align-items: center; gap: 20px; border: 1px solid ${isUpToDate ? 'rgba(57,255,20,0.1)' : 'var(--accent)'}; background: rgba(0,0,0,0.3); border-radius: 15px;">
+                  <div style="background: var(--glass-bg); padding: 10px; border-radius: 10px;">
+                    <ha-icon icon="mdi:cellphone-wireless" style="color: ${isUpToDate ? 'var(--neon-green)' : 'var(--accent)'}; font-size: 1.25em;"></ha-icon>
                   </div>
                   <div style="flex: 1;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                      <span style="font-weight: 700; font-size: 1.1em;">CYD Solar Display</span>
-                      <span style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.75em; color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);">
-                        <ha-icon icon="mdi:ip-network" style="font-size: 14px; margin-right: 4px;"></ha-icon>${ip}
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 3px;">
+                      <span style="font-weight: 700; font-size: 1.05em;">CYD DISPLAY</span>
+                      <span style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-size: 0.7em; color: var(--text-dim); border: 1px solid rgba(255,255,255,0.05); font-family: 'JetBrains Mono';">
+                        ${ip}
                       </span>
                     </div>
-                    <div style="font-size: 0.85em; color: var(--text-dim);">
+                    <div style="font-size: 0.8em; color: var(--text-dim);">
                       Installiert: <strong style="color: #fff;">${data.version}</strong> | Verfügbar: <strong style="color: var(--accent);">${this._latestVersion || '...'}</strong>
                     </div>
                   </div>
                   
                   <div>
                     ${isUpToDate ? html`
-                      <div style="background: rgba(57,255,20,0.1); color: var(--neon-green); padding: 6px 12px; border-radius: 8px; font-size: 0.85em; border: 1px solid var(--neon-green); display: flex; align-items: center; gap: 8px;">
-                        <ha-icon icon="mdi:check-decagram" style="font-size: 18px;"></ha-icon> Aktuell
+                      <div style="background: rgba(57,255,20,0.05); color: var(--neon-green); padding: 5px 12px; border-radius: 8px; font-size: 0.8em; border: 1px solid rgba(57,255,20,0.2); display: flex; align-items: center; gap: 6px;">
+                        <ha-icon icon="mdi:check-decagram" style="font-size: 16px;"></ha-icon> AKTUELL
                       </div>
                     ` : html`
                       <button class="mega-save-btn" 
-                        style="padding: 10px 20px; background: var(--accent); color: #000; font-size: 0.85em; box-shadow: 0 0 15px rgba(247, 147, 26, 0.3);"
+                        style="padding: 8px 16px; background: var(--accent); color: #000; font-size: 0.75em; box-shadow: 0 0 15px rgba(247, 147, 26, 0.2); margin-top: 0; width: auto;"
                         @click="${() => this._triggerDisplayUpdate(ip)}">
-                        <ha-icon icon="mdi:rocket-launch" style="font-size: 18px; margin-right: 8px;"></ha-icon>UPDATE STARTEN
+                        <ha-icon icon="mdi:rocket-launch" style="font-size: 16px; margin-right: 6px;"></ha-icon>UPDATE
                       </button>
                     `}
                   </div>
