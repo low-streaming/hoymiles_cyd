@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+#include <ESPmDNS.h>
 
 
 #define CURRENT_VERSION "v1.1.1"
@@ -100,13 +101,33 @@ void wifi_connect() {
 #define COLOR_GRID tft.color565(51, 255, 153)
 #define COLOR_BAT tft.color565(51, 153, 255)
 
+// Fixed-size card cache — avoids heap allocations (no std::map)
+#define MAX_CARDS 8
+struct CardCache { int id; float val; };
+static CardCache card_cache[MAX_CARDS] = {};
+static int card_cache_count = 0;
+
+float* card_cache_get(int id) {
+  for (int i = 0; i < card_cache_count; i++)
+    if (card_cache[i].id == id) return &card_cache[i].val;
+  return nullptr;
+}
+
+void card_cache_set(int id, float val) {
+  for (int i = 0; i < card_cache_count; i++) {
+    if (card_cache[i].id == id) { card_cache[i].val = val; return; }
+  }
+  if (card_cache_count < MAX_CARDS) {
+    card_cache[card_cache_count++] = {id, val};
+  }
+}
+
 void draw_card(int x, int y, int w, int h, const char *label, float val,
                const char *unit, uint16_t color, bool force = false) {
-  static std::map<int, float> last_vals;
   int id = x * 1000 + y;
+  float* cached = card_cache_get(id);
 
-  if (force || last_vals[id] != val) {
-    // Only clear the value area if not force (force clears the whole card)
+  if (force || cached == nullptr || *cached != val) {
     if (force) {
       tft.fillRoundRect(x, y, w, h, 8, COLOR_CARD);
       tft.drawRoundRect(x, y, w, h, 8, tft.color565(50, 50, 55));
@@ -115,7 +136,6 @@ void draw_card(int x, int y, int w, int h, const char *label, float val,
       tft.setCursor(x + 8, y + 8);
       tft.print(label);
     } else {
-      // Clear ONLY the value area to avoid flicker
       tft.fillRect(x + 5, y + 22, w - 10, 30, COLOR_CARD);
     }
 
@@ -131,8 +151,8 @@ void draw_card(int x, int y, int w, int h, const char *label, float val,
     tft.setTextColor(color);
     tft.print(" ");
     tft.print(unit);
-    
-    last_vals[id] = val;
+
+    card_cache_set(id, val);
   }
 }
 
@@ -244,7 +264,11 @@ void checkForUpdate() {
       Serial.print("Latest version: ");
       Serial.println(latest);
 
-      if (!latest.endsWith(CURRENT_VERSION)) {
+      // Strip leading 'v' from both sides before comparing
+      String current = String(CURRENT_VERSION);
+      if (current.startsWith("v")) current = current.substring(1);
+      if (latest.startsWith("v")) latest = latest.substring(1);
+      if (latest != current) {
         Serial.println("New version available! Starting Update...");
         tft.fillScreen(COLOR_BG);
         tft.setTextColor(COLOR_ACCENT);
@@ -309,7 +333,7 @@ String discover_ha_ip() {
     Serial.print("Discovery: Found ");
     Serial.print(n);
     Serial.println(" HA services");
-    IPAddress ip = MDNS.IP(0);
+    IPAddress ip = MDNS.address(0);
     Serial.print("Discovery: Using service IP: ");
     Serial.println(ip.toString());
     return ip.toString();
@@ -356,29 +380,34 @@ void fetch_ha_data() {
   Serial.println(url);
 
   HTTPClient http;
-  bool success = false;
+  int httpCode = -1;
+  String payload = "";
 
   if (url.startsWith("https")) {
-    WiFiClientSecure *client_secure = new WiFiClientSecure();
-    client_secure->setInsecure();
-    http.begin(*client_secure, url);
-    delete client_secure; // Note: In newer ESP32 cores, http.begin handles the lifetime or you need to manage it.
-                          // Actually, for stability, it's better to use a pointer or wait.
+    WiFiClientSecure client_secure;
+    client_secure.setInsecure();
+    http.begin(client_secure, url);
+    if (strlen(ha_token) > 5) {
+      http.addHeader("Authorization", "Bearer " + String(ha_token));
+    }
+    httpCode = http.GET();
+    if (httpCode == 200) payload = http.getString();
+    http.end();
   } else {
     WiFiClient client;
     http.begin(client, url);
+    if (strlen(ha_token) > 5) {
+      http.addHeader("Authorization", "Bearer " + String(ha_token));
+    }
+    httpCode = http.GET();
+    if (httpCode == 200) payload = http.getString();
+    http.end();
   }
 
-  if (strlen(ha_token) > 5) {
-    http.addHeader("Authorization", "Bearer " + String(ha_token));
-  }
-
-  int httpCode = http.GET();
   Serial.print("Result Code: ");
   Serial.println(httpCode);
 
   if (httpCode == 200) {
-    String payload = http.getString();
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
 
@@ -395,7 +424,6 @@ void fetch_ha_data() {
         Serial.println("Update trigger from Home Assistant!");
         checkForUpdate();
       }
-      success = true;
       Serial.println("Sync: SUCCESS");
     } else {
       Serial.print("JSON Error: ");
@@ -409,7 +437,6 @@ void fetch_ha_data() {
     if (httpCode == 401)
       Serial.println("Error: Unauthorized! Please provide a Token.");
   }
-  http.end();
   display_update();
 }
 
@@ -417,6 +444,9 @@ void setup() {
   Serial.begin(115200);
   tft.begin();
   tft.setRotation(1); // Landscape
+
+  // WiFi must connect BEFORE mDNS can start
+  wifi_connect();
 
   if (!MDNS.begin("hoymiles-cyd")) {
     Serial.println("Error setting up MDNS responder!");
@@ -426,7 +456,6 @@ void setup() {
     MDNS.addServiceTxt("hoymiles-cyd", "tcp", "version", CURRENT_VERSION);
   }
 
-  wifi_connect();
   checkForUpdate();
   fetch_ha_data();
 }
