@@ -247,16 +247,22 @@ void checkForUpdate() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE);
   tft.setCursor(10, 10);
-  tft.println("Checking for updates...");
+  tft.setTextSize(2);
+  tft.println("OTA UPDATE");
+  tft.setTextSize(1);
+  tft.setCursor(10, 40);
+  tft.println("Connecting to GitHub...");
 
   WiFiClientSecure client;
-  client.setInsecure(); // GitHub uses HTTPS
+  client.setInsecure();
+  client.setTimeout(15000); // 15s timeout
   HTTPClient http;
 
   http.begin(client, MANIFEST_URL);
   int httpCode = http.GET();
 
   if (httpCode == 200) {
+    tft.println("Manifest received. Checking version...");
     String payload = http.getString();
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
@@ -266,40 +272,37 @@ void checkForUpdate() {
       Serial.print("Latest version: ");
       Serial.println(latest);
 
-      // Strip leading 'v' from both sides before comparing
       String current = String(CURRENT_VERSION);
       if (current.startsWith("v")) current = current.substring(1);
       if (latest.startsWith("v")) latest = latest.substring(1);
+      
       if (latest != current) {
         Serial.println("New version available! Starting Update...");
         tft.fillScreen(COLOR_BG);
         tft.setTextColor(COLOR_ACCENT);
-        tft.setCursor(40, 100);
+        tft.setCursor(40, 80);
         tft.setTextSize(2);
         tft.println("NEW UPDATE FOUND!");
-        tft.setCursor(40, 130);
+        tft.setCursor(40, 110);
         tft.setTextSize(1);
         tft.setTextColor(TFT_WHITE);
         tft.print("Installing: ");
         tft.println(latest);
 
-        tft.fillRect(40, 160, 240, 20, COLOR_CARD);
-        tft.drawRect(40, 160, 240, 20, COLOR_DIM);
+        tft.fillRect(40, 140, 240, 20, COLOR_CARD);
+        tft.drawRect(40, 140, 240, 20, COLOR_DIM);
 
-        // Perform HTTP Update
         httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         t_httpUpdate_return ret = httpUpdate.update(client, UPDATE_URL);
 
         switch (ret) {
         case HTTP_UPDATE_FAILED:
-          Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n",
-                        httpUpdate.getLastError(),
-                        httpUpdate.getLastErrorString().c_str());
-          tft.setCursor(40, 200);
+          Serial.printf("Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+          tft.setCursor(40, 180);
           tft.setTextColor(TFT_RED);
           tft.println("Update Failed! Restarting...");
           delay(3000);
-          ESP.restart(); // Heap is corrupted after failed OTA — must restart
+          ESP.restart(); 
         case HTTP_UPDATE_NO_UPDATES:
           Serial.println("HTTP_UPDATE_NO_UPDATES");
           break;
@@ -309,13 +312,18 @@ void checkForUpdate() {
         }
       } else {
         Serial.println("Firmware is up to date.");
+        tft.setCursor(10, 80);
+        tft.setTextColor(COLOR_ACCENT);
+        tft.println("You are using the latest version!");
+        delay(2000);
       }
     }
+  } else {
+    tft.setTextColor(TFT_RED);
+    tft.println("Failed to connect to GitHub.");
+    delay(2000);
   }
   http.end();
-  // Do NOT call display_update() here — the large stack frame from
-  // WiFiClientSecure/HTTPClient is still live and would cause a stack overflow.
-  // Instead, signal loop() to call it after this frame is cleaned up.
   needs_display_update = true;
 }
 

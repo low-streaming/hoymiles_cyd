@@ -1097,7 +1097,8 @@ class HoymilesCYDPanel extends LitElement {
                 <p style="margin: 0;">Keine aktiven Displays gefunden.<br/><small style="opacity: 0.6;">Stelle sicher, dass dein CYD eingeschaltet ist.</small></p>
               </div>
             ` : displays.map(([ip, data]) => {
-              const isUpToDate = data.version === this._latestVersion;
+              const vNormal = (v) => v.startsWith('v') ? v.substring(1) : v;
+              const isUpToDate = vNormal(data.version) === vNormal(this._latestVersion);
               return html`
                 <div class="glass-card" style="padding: 15px 20px; display: flex; align-items: center; gap: 20px; border: 1px solid ${isUpToDate ? 'rgba(57,255,20,0.1)' : 'var(--accent)'}; background: rgba(0,0,0,0.3); border-radius: 15px;">
                   <div style="background: var(--glass-bg); padding: 10px; border-radius: 10px;">
