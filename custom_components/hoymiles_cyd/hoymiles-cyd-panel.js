@@ -188,30 +188,15 @@ class HoymilesCYDPanel extends LitElement {
     this._historyData = [];
     this._configLoaded = false;
     this._availableInverters = [];
+    this._updateEventUnsub = null;
+    this._historyInterval = null;
+    this._boundCheckUpdate = this._checkUpdate.bind(this);
   }
 
-  updated(changedProps) {
-    if (changedProps.has('hass') && this.hass && !this._configLoaded) {
-      this._loadConfig();
-      this._loadInverters();
-      this._configLoaded = true;
-      this._fetchHistory();
-      this._checkUpdate();
-      setInterval(() => this._fetchHistory(), 60000);
-
-      this.addEventListener('click', () => {
-        const pickers = this.shadowRoot.querySelectorAll('hoymiles-entity-picker');
-        pickers.forEach(p => p.open = false);
-      });
-
-      // Listen for update events via HA Connection
-      if (this.hass.connection) {
-        this._updateEventUnsub = this.hass.connection.subscribeEvents((event) => {
-          this._isUpdating = false;
-          this._updateStatus = event.data.status === 'success' ? 'Update erfolgreich! Bitte HA neu starten.' : 'Fehler: ' + event.data.message;
-          this.requestUpdate();
-        }, 'hoymiles_cyd_update_completed');
-      }
+  connectedCallback() {
+    super.connectedCallback();
+    if (this.hass) {
+      this._initialize();
     }
   }
 
@@ -219,6 +204,88 @@ class HoymilesCYDPanel extends LitElement {
     super.disconnectedCallback();
     if (this._updateEventUnsub) {
       this._updateEventUnsub();
+      this._updateEventUnsub = null;
+    }
+    if (this._historyInterval) {
+      clearInterval(this._historyInterval);
+      this._historyInterval = null;
+    }
+  }
+
+  async _initialize() {
+    if (this._configLoaded) return;
+    await this._loadConfig();
+    await this._loadInverters();
+    this._configLoaded = true;
+    this._fetchHistory();
+    this._checkUpdate();
+    
+    if (this._historyInterval) clearInterval(this._historyInterval);
+    this._historyInterval = setInterval(() => this._fetchHistory(), 60000);
+
+    // Listen for update events via HA Connection
+    if (this.hass.connection && !this._updateEventUnsub) {
+      this._updateEventUnsub = this.hass.connection.subscribeEvents((event) => {
+        this._isUpdating = false;
+        this._updateStatus = event.data.status === 'success' ? 'Update erfolgreich! Bitte HA neu starten.' : 'Fehler: ' + event.data.message;
+        this.requestUpdate();
+      }, 'hoymiles_cyd_update_completed');
+    }
+  }
+
+  shouldUpdate(changedProps) {
+    // If it's the first render or internal state changed, always update
+    if (!changedProps.has('hass')) return true;
+
+    // If hass changed, only update if relevant entities changed
+    const oldHass = changedProps.get('hass');
+    if (!oldHass || !this.hass) return true;
+
+    // List of sensors we monitor in our config
+    const monitorEntities = [
+      this.config.solar_power_sensor,
+      this.config.grid_sensor,
+      this.config.battery_power_sensor,
+      this.config.battery_soc_sensor,
+      this.config.solar_energy_yield_sensor,
+      this.config.grid_energy_import_sensor,
+      this.config.grid_energy_export_sensor,
+      'sensor.zero_export_controller_nulleinspeisung_status',
+      'sensor.zero_export_controller_zero_export_status',
+      'sensor.zero_export_controller_nulleinspeisung_leistungslimit',
+      'sensor.zero_export_controller_zero_export_limit'
+    ];
+
+    // Add sub-consumers
+    if (this.config.enable_sub_consumers) {
+      for (let i = 1; i <= 4; i++) {
+        monitorEntities.push(this.config[`sub_consumer_${i}_sensor`]);
+        monitorEntities.push(this.config[`sub_consumer_${i}_toggle`]);
+      }
+    }
+
+    // Check if any monitored entity has changed its state
+    for (const entityId of monitorEntities) {
+      if (!entityId) continue;
+      if (this.hass.states[entityId] !== oldHass.states[entityId]) {
+        return true;
+      }
+    }
+
+    // Check for internal property changes (tabs, update status etc.)
+    if (changedProps.has('activeTab') || 
+        changedProps.has('_latestVersion') || 
+        changedProps.has('_isUpdating') || 
+        changedProps.has('_updateStatus')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass && !this._configLoaded) {
+      this._initialize();
     }
   }
 
@@ -325,6 +392,7 @@ class HoymilesCYDPanel extends LitElement {
 
   renderDashboard() {
     const getScaled = (entityId, scale) => {
+      if (!entityId || !this.hass.states[entityId]) return 0;
       const state = this.hass.states[entityId];
       if (!state || state.state === 'unavailable' || state.state === 'unknown') return 0;
       let val = parseFloat(state.state) || 0;

@@ -1,10 +1,16 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <Preferences.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+
+#define CURRENT_VERSION "v1.1.1"
+#define UPDATE_URL "https://github.com/low-streaming/hoymiles_cyd/raw/main/cyd-hoymiles/firmware.bin"
+#define MANIFEST_URL "https://raw.githubusercontent.com/low-streaming/hoymiles_cyd/main/custom_components/hoymiles_cyd/manifest.json"
 
 Preferences preferences;
 TFT_eSPI tft = TFT_eSPI();
@@ -180,6 +186,85 @@ void display_update() {
   tft.print("REGELUNG: ");
   tft.setTextColor(COLOR_ACCENT);
   tft.print(status_text);
+
+  // Version Info
+  tft.setTextColor(COLOR_DIM);
+  tft.setTextSize(1);
+  tft.setCursor(260, 220);
+  tft.print(CURRENT_VERSION);
+}
+
+void checkForUpdate() {
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+
+  Serial.println("Checking for Update...");
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE);
+  tft.setCursor(10, 10);
+  tft.println("Checking for updates...");
+
+  WiFiClientSecure client;
+  client.setInsecure(); // GitHub uses HTTPS
+  HTTPClient http;
+
+  http.begin(client, MANIFEST_URL);
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String payload = http.getString();
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (!error) {
+      String latest = doc["version"].as<String>();
+      Serial.print("Latest version: ");
+      Serial.println(latest);
+
+      if (!latest.endsWith(CURRENT_VERSION)) {
+        Serial.println("New version available! Starting Update...");
+        tft.fillScreen(COLOR_BG);
+        tft.setTextColor(COLOR_ACCENT);
+        tft.setCursor(40, 100);
+        tft.setTextSize(2);
+        tft.println("NEW UPDATE FOUND!");
+        tft.setCursor(40, 130);
+        tft.setTextSize(1);
+        tft.setTextColor(TFT_WHITE);
+        tft.print("Installing: ");
+        tft.println(latest);
+
+        tft.fillRect(40, 160, 240, 20, COLOR_CARD);
+        tft.drawRect(40, 160, 240, 20, COLOR_DIM);
+
+        // Perform HTTP Update
+        httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        t_httpUpdate_return ret = httpUpdate.update(client, UPDATE_URL);
+
+        switch (ret) {
+        case HTTP_UPDATE_FAILED:
+          Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n",
+                        httpUpdate.getLastError(),
+                        httpUpdate.getLastErrorString().c_str());
+          tft.setCursor(40, 200);
+          tft.setTextColor(TFT_RED);
+          tft.println("Update Failed!");
+          delay(5000);
+          break;
+        case HTTP_UPDATE_NO_UPDATES:
+          Serial.println("HTTP_UPDATE_NO_UPDATES");
+          break;
+        case HTTP_UPDATE_OK:
+          Serial.println("HTTP_UPDATE_OK");
+          break;
+        }
+      } else {
+        Serial.println("Firmware is up to date.");
+      }
+    }
+  }
+  http.end();
+  display_update();
 }
 
 void fetch_ha_data() {
@@ -265,6 +350,7 @@ void setup() {
   tft.setRotation(1); // Landscape
 
   wifi_connect();
+  checkForUpdate();
   fetch_ha_data();
 }
 
