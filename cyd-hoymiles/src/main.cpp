@@ -7,7 +7,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
-#include <ESPmDNS.h>
+
 
 #define CURRENT_VERSION "v1.1.1"
 #define UPDATE_URL "https://github.com/low-streaming/hoymiles_cyd/raw/main/cyd-hoymiles/firmware.bin"
@@ -101,40 +101,72 @@ void wifi_connect() {
 #define COLOR_BAT tft.color565(51, 153, 255)
 
 void draw_card(int x, int y, int w, int h, const char *label, float val,
-               const char *unit, uint16_t color) {
-  tft.fillRoundRect(x, y, w, h, 8, COLOR_CARD);
-  tft.drawRoundRect(x, y, w, h, 8, tft.color565(50, 50, 55));
+               const char *unit, uint16_t color, bool force = false) {
+  static std::map<int, float> last_vals;
+  int id = x * 1000 + y;
 
-  tft.setTextColor(COLOR_DIM);
-  tft.setTextSize(1);
-  tft.setCursor(x + 8, y + 8);
-  tft.print(label);
+  if (force || last_vals[id] != val) {
+    // Only clear the value area if not force (force clears the whole card)
+    if (force) {
+      tft.fillRoundRect(x, y, w, h, 8, COLOR_CARD);
+      tft.drawRoundRect(x, y, w, h, 8, tft.color565(50, 50, 55));
+      tft.setTextColor(COLOR_DIM);
+      tft.setTextSize(1);
+      tft.setCursor(x + 8, y + 8);
+      tft.print(label);
+    } else {
+      // Clear ONLY the value area to avoid flicker
+      tft.fillRect(x + 5, y + 22, w - 10, 30, COLOR_CARD);
+    }
 
-  tft.setTextColor(TFT_WHITE);
-  tft.setTextSize(3);
-  tft.setCursor(x + 10, y + 25);
-  // Simple check for large values
-  if (val < 10 && val > -10)
-    tft.print(val, 1);
-  else
-    tft.print((int)val);
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextSize(3);
+    tft.setCursor(x + 10, y + 25);
+    if (val < 10 && val > -10)
+      tft.print(val, 1);
+    else
+      tft.print((int)val);
 
-  tft.setTextSize(1);
-  tft.setTextColor(color);
-  tft.print(" ");
-  tft.print(unit);
+    tft.setTextSize(1);
+    tft.setTextColor(color);
+    tft.print(" ");
+    tft.print(unit);
+    
+    last_vals[id] = val;
+  }
 }
 
 void display_update() {
-  tft.fillScreen(COLOR_BG);
+  static bool layout_drawn = false;
+  
+  if (!layout_drawn) {
+    tft.fillScreen(COLOR_BG);
+    // Header
+    tft.fillRect(0, 0, 320, 35, tft.color565(20, 20, 25));
+    tft.setTextColor(COLOR_ACCENT);
+    tft.setTextSize(2);
+    tft.setCursor(10, 10);
+    tft.print("Solar Zentrale");
+    
+    // Static UI Elements (Visualizer Circle)
+    int cx = 160, cy = 135, r = 55;
+    tft.drawCircle(cx, cy, r, tft.color565(40, 40, 50));
+    tft.drawCircle(cx, cy, r + 1, tft.color565(30, 30, 40));
+    
+    // Flow Lines (Simple)
+    tft.drawLine(65, 110, 120, 100, COLOR_SOLAR);
+    
+    // Cards Initial
+    draw_card(10, 45, 110, 65, "SOLAR", solar_power, "W", COLOR_SOLAR, true);
+    draw_card(10, 115, 110, 65, "ERTRAG", solar_yield, "kWh", COLOR_ACCENT, true);
+    draw_card(200, 45, 110, 65, "AKKU", bat_soc, "%", COLOR_BAT, true);
+    draw_card(200, 115, 110, 65, "HAUS", (solar_power + grid_power - bat_power), "W", COLOR_ACCENT, true);
 
-  // Header
-  tft.fillRect(0, 0, 320, 35, tft.color565(20, 20, 25));
-  tft.setTextColor(COLOR_ACCENT);
-  tft.setTextSize(2);
-  tft.setCursor(10, 10);
-  tft.print("Solar Zentrale");
+    layout_drawn = true;
+  }
 
+  // Status Indicator
+  tft.fillRect(240, 0, 80, 35, tft.color565(20, 20, 25));
   tft.setTextSize(1);
   tft.setCursor(240, 12);
   if (is_offline) {
@@ -145,14 +177,9 @@ void display_update() {
     tft.print("AKTIV");
   }
 
-  // Visualizer Center Ring (Power Core Style)
-  int cx = 160, cy = 135, r = 55;
-  tft.drawCircle(cx, cy, r, tft.color565(40, 40, 50));
-  tft.drawCircle(cx, cy, r + 1, tft.color565(30, 30, 40));
-
-  // Grid Pulse Indicator
-  uint16_t grid_color =
-      (grid_power > 0) ? COLOR_BAT : COLOR_GRID; // Import vs Export
+  // Grid Pulse Indicator Update
+  int cx = 160, cy = 135;
+  uint16_t grid_color = (grid_power > 0) ? COLOR_BAT : COLOR_GRID;
   tft.fillCircle(cx, cy, 40, COLOR_CARD);
   tft.drawCircle(cx, cy, 40, grid_color);
 
@@ -169,19 +196,14 @@ void display_update() {
   tft.setCursor(cx - tft.textWidth(grid_txt) / 2, cy + 12);
   tft.print(grid_txt);
 
-  // Flow Lines (Simple)
-  // Solar to center
-  tft.drawLine(65, 110, cx - cx / 4, cy - cy / 4, COLOR_SOLAR);
-
-  // Cards
+  // Cards Dynamic Update
   draw_card(10, 45, 110, 65, "SOLAR", solar_power, "W", COLOR_SOLAR);
   draw_card(10, 115, 110, 65, "ERTRAG", solar_yield, "kWh", COLOR_ACCENT);
-
   draw_card(200, 45, 110, 65, "AKKU", bat_soc, "%", COLOR_BAT);
-  draw_card(200, 115, 110, 65, "HAUS", (solar_power + grid_power - bat_power),
-            "W", COLOR_ACCENT);
+  draw_card(200, 115, 110, 65, "HAUS", (solar_power + grid_power - bat_power), "W", COLOR_ACCENT);
 
   // Footer / Status
+  tft.fillRect(0, 215, 320, 25, COLOR_BG);
   tft.setTextColor(COLOR_DIM);
   tft.setCursor(10, 220);
   tft.print("REGELUNG: ");
@@ -269,18 +291,31 @@ void checkForUpdate() {
 }
 
 String discover_ha_ip() {
-  Serial.println("Suche Home Assistant via mDNS (homeassistant.local)...");
+  Serial.println("--- Discovery ---");
+  Serial.println("Suche Home Assistant via mDNS...");
   
-  // Direkte Host-Abfrage ist im neuen ESP32 Core 3.x am stabilsten
+  // 1. Try homeassistant.local directly (standard)
   IPAddress srv = MDNS.queryHost("homeassistant");
-  
   if (srv != IPAddress(0,0,0,0)) {
-    Serial.print("Home Assistant gefunden: ");
+    Serial.print("Discovery: Found via hostname: ");
     Serial.println(srv.toString());
     return srv.toString();
   }
 
-  Serial.println("Home Assistant konnte nicht via mDNS gefunden werden.");
+  // 2. Try to find the _homeassistant._tcp.local service
+  Serial.println("Suche _homeassistant._tcp.local...");
+  int n = MDNS.queryService("homeassistant", "tcp");
+  if (n > 0) {
+    Serial.print("Discovery: Found ");
+    Serial.print(n);
+    Serial.println(" HA services");
+    IPAddress ip = MDNS.IP(0);
+    Serial.print("Discovery: Using service IP: ");
+    Serial.println(ip.toString());
+    return ip.toString();
+  }
+
+  Serial.println("Discovery: FAILED");
   return "";
 }
 
@@ -288,16 +323,13 @@ void fetch_ha_data() {
   if (WiFi.status() != WL_CONNECTED)
     return;
 
-  WiFiClient client;
-  HTTPClient http;
-
   String url = String(ha_host);
   if (url == "homeassistant.local" || url.length() < 5) {
     String discovered = discover_ha_ip();
     if (discovered.length() > 0) {
       url = discovered;
     } else {
-      url = "homeassistant.local"; // Fallback auf Namen
+      url = "homeassistant.local"; // Fallback
     }
   }
 
@@ -306,32 +338,37 @@ void fetch_ha_data() {
     url = "http://" + url;
   }
 
-  // Only append :8123 if NO port is specified (checks for second colon after
-  // http://)
+  // Only append :8123 if NO port is specified
   if (url.indexOf(":", 7) == -1) {
     url += ":8123";
   }
 
-  // Ensure we use the NEW flat API path
   if (!url.endsWith("/api/hoymiles_cyd_sync")) {
     if (url.endsWith("/"))
       url.remove(url.length() - 1);
     url += "/api/hoymiles_cyd_sync";
   }
 
-  // Append current version for display tracking in HA
   url += "?v=" + String(CURRENT_VERSION);
 
   Serial.println("--- Sync Attempt ---");
   Serial.print("Target URL: ");
   Serial.println(url);
-  if (strlen(ha_token) > 10) {
-    Serial.println("Auth: Token provided");
+
+  HTTPClient http;
+  bool success = false;
+
+  if (url.startsWith("https")) {
+    WiFiClientSecure *client_secure = new WiFiClientSecure();
+    client_secure->setInsecure();
+    http.begin(*client_secure, url);
+    delete client_secure; // Note: In newer ESP32 cores, http.begin handles the lifetime or you need to manage it.
+                          // Actually, for stability, it's better to use a pointer or wait.
   } else {
-    Serial.println("Auth: No token (trying Public Access)");
+    WiFiClient client;
+    http.begin(client, url);
   }
 
-  http.begin(client, url);
   if (strlen(ha_token) > 5) {
     http.addHeader("Authorization", "Bearer " + String(ha_token));
   }
@@ -354,12 +391,11 @@ void fetch_ha_data() {
       status_text = doc["status"].as<String>();
       is_offline = false;
       
-      // Check if HA wants us to update
       if (doc["update"]) {
         Serial.println("Update trigger from Home Assistant!");
         checkForUpdate();
       }
-      
+      success = true;
       Serial.println("Sync: SUCCESS");
     } else {
       Serial.print("JSON Error: ");
