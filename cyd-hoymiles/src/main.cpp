@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+#include <ESPmDNS.h>
 
 #define CURRENT_VERSION "v1.1.1"
 #define UPDATE_URL "https://github.com/low-streaming/hoymiles_cyd/raw/main/cyd-hoymiles/firmware.bin"
@@ -45,7 +46,7 @@ void wifi_connect() {
   // Open Preferences
   preferences.begin("hoymiles", false);
   String saved_host =
-      preferences.getString("ha_host", "http://192.168.2.69:8123");
+      preferences.getString("ha_host", "homeassistant.local");
   String saved_token = preferences.getString("ha_token", "");
   strncpy(ha_host, saved_host.c_str(), sizeof(ha_host));
   strncpy(ha_token, saved_token.c_str(), sizeof(ha_token));
@@ -267,6 +268,29 @@ void checkForUpdate() {
   display_update();
 }
 
+String discover_ha_ip() {
+  Serial.println("Searching for Home Assistant via mDNS (_home-assistant._tcp)...");
+  int n = MDNS.queryService("home-assistant", "tcp");
+  if (n > 0) {
+    String found_ip = MDNS.IP(0).toString();
+    Serial.print("Found HA at: ");
+    Serial.println(found_ip);
+    return found_ip;
+  }
+  
+  // Try resolving homeassistant.local directly
+  Serial.println("Trying to resolve homeassistant.local...");
+  IPAddress srv;
+  if (WiFi.hostByName("homeassistant.local", srv)) {
+    Serial.print("Resolved homeassistant.local to: ");
+    Serial.println(srv.toString());
+    return srv.toString();
+  }
+
+  Serial.println("HA not found via mDNS.");
+  return "";
+}
+
 void fetch_ha_data() {
   if (WiFi.status() != WL_CONNECTED)
     return;
@@ -275,8 +299,14 @@ void fetch_ha_data() {
   HTTPClient http;
 
   String url = String(ha_host);
-  if (url.length() < 5)
-    return;
+  if (url == "homeassistant.local" || url.length() < 5) {
+    String discovered = discover_ha_ip();
+    if (discovered.length() > 0) {
+      url = discovered;
+    } else {
+      url = "homeassistant.local"; // Fallback auf Namen
+    }
+  }
 
   // Fix URL Scheme
   if (!url.startsWith("http")) {
@@ -358,6 +388,14 @@ void setup() {
   Serial.begin(115200);
   tft.begin();
   tft.setRotation(1); // Landscape
+
+  if (!MDNS.begin("hoymiles-cyd")) {
+    Serial.println("Error setting up MDNS responder!");
+  } else {
+    Serial.println("mDNS responder started: hoymiles-cyd");
+    MDNS.addService("hoymiles-cyd", "tcp", 80);
+    MDNS.addServiceTxt("hoymiles-cyd", "tcp", "version", CURRENT_VERSION);
+  }
 
   wifi_connect();
   checkForUpdate();

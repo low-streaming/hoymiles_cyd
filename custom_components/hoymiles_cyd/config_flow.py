@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.const import CONF_HOST
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.core import callback
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .const import (
     CONF_DTU_SERIAL_NUMBER,
@@ -73,6 +74,18 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry: ConfigEntry) -> "HoymilesInverterOptionsFlowHandler":
         """Get the options flow for this handler."""
         return HoymilesInverterOptionsFlowHandler(config_entry)
+
+    async def async_step_zeroconf(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> FlowResult:
+        """Handle zeroconf discovery."""
+        host = discovery_info.host
+        
+        # Check if already configured
+        await self.async_set_unique_id(f"cyd_{host}")
+        self._abort_if_unique_id_configured()
+        
+        return await self.async_step_user({CONF_HOST: host})
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
