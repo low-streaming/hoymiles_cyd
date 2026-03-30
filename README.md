@@ -14,6 +14,7 @@ Dieses Modul bietet eine direkte Schnittstelle und intelligente Regelung (Zero-E
 - **Batterie-Schutz-Management**: Konfiguriere eigene untere (Abschalt-SOC) und obere (Restart-SOC) Limits zum schonenden Umgang mit deiner Batterie, damit Nulleinspeisung die Zellen nie tiefenentlädt.
 - **Zusatzverbraucher-Tracking**: Binde gezielt große Geräte (z.B. Wärmepumpen, Wasserboiler oder Krypto-Miner) live in den Energiefluss ein und lass sie auf Wunsch intelligent in die Nulleinspeisung hochrechnen.
 - **Grundlast-Modus (Plugs)**: Alternativer Betriebsmodus, bei dem feste "Smart Plugs" die Referenz für den Inverter bilden – ideal, wenn man noch keinen Zählersensor hat.
+- **Manueller Modus**: Setze per Eingabe ein fixes, permanentes Limit für den Wechselrichter. Keine Automatik greift ein, das Limit bleibt starr auf dem gewünschten Wert.
 
 ---
 
@@ -31,7 +32,7 @@ Mit der neuen App-UI kannst du das Modul komplett "on the fly" verwalten:
 
 1. **Dashboard-Tab**: Hier siehst du die Live-Ströme (Solar, Haus, Netz, Batterie). Oben rechts ist der Master-Mode der Integration zu sehen.
 2. **Einstellungen-Tab**:
-   - **Steuerung**: Wähle zwischen `ZEN (Automatik)` am Hauptzähler und `Grundlast (Plugs)`.
+   - **Steuerung**: Wähle flexibel zwischen `ZEN (Automatik)` am Hauptzähler, `Grundlast (Plugs)` oder auch `Manuell (Fester Wert)`.
    - **Intelligenz**: Definiere deinen „Ziel-Bezug am Zähler“ (z.B. 10W Puffer) und die absolute Limitierung deines Wechselrichters.
    - **Batterie**: Hier schaltest du die Schutzautomatik ein und definierst die kritischen %, bei denen die Entladung stopt.
    - **Zusatzverbraucher**: Aktiviere einzelne Plugs (Geräte) und füge sie dem Fluss und/oder der automatischen Nulleinspeisung hinzu.
@@ -41,7 +42,8 @@ Mit der neuen App-UI kannst du das Modul komplett "on the fly" verwalten:
 
 ## 📜 Version History
 
-* **v1.1.0** (Aktuell): Komplett überarbeitetes Dashboard (Glassmorphism & Neon-Effekte), korrekte Energiefluss-Animationen (Strich-Verläufe statt Blurs), verbesserter Batterieschutz im Backend, Refaktorierung der Backend-Logger.
+* **v1.1.1** (Aktuell): Hinzufügen der statischen "Manuellen Limit-Überschreibung" im Dashboard mit zugehöriger direkter Backend-Logik für feste Wechselrichter-Drosselung.
+* **v1.1.0**: Komplett überarbeitetes Dashboard (Glassmorphism & Neon-Effekte), korrekte Energiefluss-Animationen (Strich-Verläufe statt Blurs), verbesserter Batterieschutz im Backend, Refaktorierung der Backend-Logger.
 * **v1.0.3**: Bugfixes für Nulleinspeisung-Berechnung und Integration der Backend-API.
 
 ---
