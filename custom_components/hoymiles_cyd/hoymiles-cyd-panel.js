@@ -159,6 +159,7 @@ class HoymilesCYDPanel extends LitElement {
       battery_soc_sensor: '',
       battery_power_sensor: '',
       target_grid_watt: 10,
+      manual_limit_value: 50,
       max_capacity: 800,
       min_limit: 10,
       max_limit: 100,
@@ -561,9 +562,21 @@ class HoymilesCYDPanel extends LitElement {
                   @change="${(e) => this.config = { ...this.config, operation_mode: e.target.value }}">
                    <option value="zero_export">ZEN (Automatik)</option>
                    <option value="base_load">Grundlast (Plugs)</option>
-                   <option value="manual_limit">Manuell (%)</option>
+                   <option value="manual_limit">Manuell</option>
                    <option value="disabled">Inaktiv</option>
                 </select>
+             </div>
+
+             <div class="cfg-row animate-fade-in" style="display: ${this.config.operation_mode === 'manual_limit' ? 'flex' : 'none'}; border-left: 3px solid var(--accent); padding-left: 15px; background: rgba(247, 147, 26, 0.05); margin-top: -10px; margin-bottom: 20px; border-radius: 0 8px 8px 0;">
+                <div class="cfg-info">
+                   <div class="cfg-label" style="color: var(--accent);">Manuelles Limit</div>
+                   <div class="cfg-desc">Trage hier den festen Wert ein, der statisch an den Wechselrichter gesendet werden soll.</div>
+                </div>
+                <div class="input-wrap">
+                   <input type="number" class="cfg-num" style="border-color: var(--accent);" .value="${this.config.manual_limit_value || 50}"
+                     @change="${(e) => { this.config = { ...this.config, manual_limit_value: e.target.value }; this.requestUpdate(); }}">
+                   <span class="unit-tag">${((this.config.inverter_type !== 'hoymiles' && this.config.generic_limit_type === 'watt') ? 'W' : '%')}</span>
+                </div>
              </div>
 
              <div class="cfg-row">

@@ -250,8 +250,8 @@ class ZeroExportManager:
             # Trigger initial update always
             self.hass.async_create_task(self._handle_base_load_change(None))
         elif mode == "manual_limit":
-             # Manual mode might not need trackers, but we could track a number entity
-             pass
+            _LOGGER.info("Zero Export: Manual mode active. Applying static manual limit.")
+            self.hass.async_create_task(self._apply_manual_limit())
 
     def stop(self):
         """Stop the zero export logic."""
@@ -570,3 +570,50 @@ class ZeroExportManager:
             _LOGGER.error(f"Error in Zero Export adjustment: {err}")
         finally:
             self._is_updating = False
+
+    async def _apply_manual_limit(self):
+        """Directly apply manual limit without hysteresis or constraints."""
+        try:
+            val = float(self._config.get("manual_limit_value", 50.0))
+        except ValueError:
+            return
+
+        self._last_limit = val
+        self._trigger_callbacks()
+
+        inv_type = self._config.get("inverter_type", "hoymiles")
+        
+        try:
+            if inv_type == "hoymiles":
+                hass_data = self.hass.data[DOMAIN].get(self.entry.entry_id)
+                if hass_data and hass_data.get(HASS_DTU):
+                    dtu = hass_data[HASS_DTU]
+                    target_inverter = self._config.get("selected_inverter", "all")
+                    _LOGGER.info(f"Zero Export (Manual): Setting direct limit to {val}% (Target: {target_inverter})")
+                    if target_inverter == "all":
+                        await dtu.async_set_power_limit(val)
+                    else:
+                        try:
+                            await dtu.async_set_power_limit(val, [target_inverter])
+                        except Exception as e:
+                            await dtu.async_set_power_limit(val)
+            else:
+                limit_entity = self._config.get("external_limit_entity")
+                if limit_entity:
+                    domain_part = limit_entity.split('.')[0]
+                    service = "set_value"
+                    service_data = {"entity_id": limit_entity, "value": val}
+                    
+                    if domain_part in ("select", "input_select"):
+                        service = "select_option"
+                        service_data = {"entity_id": limit_entity, "option": str(val)}
+                        
+                    _LOGGER.info(f"Zero Export (Manual): Setting {limit_entity} to {val}")
+                    await self.hass.services.async_call(
+                        domain_part,
+                        service,
+                        service_data,
+                        blocking=True
+                    )
+        except Exception as e:
+            _LOGGER.error(f"Failed to apply manual limit: {e}")
