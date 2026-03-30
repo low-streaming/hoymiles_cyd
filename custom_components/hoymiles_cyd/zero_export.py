@@ -575,13 +575,29 @@ class ZeroExportManager:
         """Directly apply manual limit without hysteresis or constraints."""
         try:
             val = float(self._config.get("manual_limit_value", 50.0))
+            manual_unit = self._config.get("manual_limit_type", "percent")
         except ValueError:
             return
-
-        self._last_limit = val
-        self._trigger_callbacks()
-
+            
         inv_type = self._config.get("inverter_type", "hoymiles")
+        target_val = val
+        
+        # Determine if we need to convert W -> %
+        needs_percent = True
+        if inv_type != "hoymiles":
+            generic_unit = self._config.get("generic_limit_type", "percent")
+            if generic_unit != "percent":
+                needs_percent = False
+                
+        if manual_unit == "watt" and needs_percent:
+            max_cap = float(self._config.get("max_capacity", 800.0))
+            if max_cap > 0:
+                target_val = (val / max_cap) * 100.0
+                target_val = min(100.0, max(0.0, float(target_val)))
+                target_val = round(target_val, 1)
+
+        self._last_limit = target_val
+        self._trigger_callbacks()
         
         try:
             if inv_type == "hoymiles":
@@ -589,26 +605,26 @@ class ZeroExportManager:
                 if hass_data and hass_data.get(HASS_DTU):
                     dtu = hass_data[HASS_DTU]
                     target_inverter = self._config.get("selected_inverter", "all")
-                    _LOGGER.info(f"Zero Export (Manual): Setting direct limit to {val}% (Target: {target_inverter})")
+                    _LOGGER.info(f"Zero Export (Manual): Setting direct limit to {target_val} (Target: {target_inverter})")
                     if target_inverter == "all":
-                        await dtu.async_set_power_limit(val)
+                        await dtu.async_set_power_limit(target_val)
                     else:
                         try:
-                            await dtu.async_set_power_limit(val, [target_inverter])
+                            await dtu.async_set_power_limit(target_val, [target_inverter])
                         except Exception as e:
-                            await dtu.async_set_power_limit(val)
+                            await dtu.async_set_power_limit(target_val)
             else:
                 limit_entity = self._config.get("external_limit_entity")
                 if limit_entity:
                     domain_part = limit_entity.split('.')[0]
                     service = "set_value"
-                    service_data = {"entity_id": limit_entity, "value": val}
+                    service_data = {"entity_id": limit_entity, "value": target_val}
                     
                     if domain_part in ("select", "input_select"):
                         service = "select_option"
-                        service_data = {"entity_id": limit_entity, "option": str(val)}
+                        service_data = {"entity_id": limit_entity, "option": str(target_val)}
                         
-                    _LOGGER.info(f"Zero Export (Manual): Setting {limit_entity} to {val}")
+                    _LOGGER.info(f"Zero Export (Manual): Setting {limit_entity} to {target_val}")
                     await self.hass.services.async_call(
                         domain_part,
                         service,

@@ -160,6 +160,7 @@ class HoymilesCYDPanel extends LitElement {
       battery_power_sensor: '',
       target_grid_watt: 10,
       manual_limit_value: 50,
+      manual_limit_type: 'percent',
       max_capacity: 800,
       min_limit: 10,
       max_limit: 100,
@@ -573,9 +574,13 @@ class HoymilesCYDPanel extends LitElement {
                    <div class="cfg-desc">Trage hier den festen Wert ein, der statisch an den Wechselrichter gesendet werden soll.</div>
                 </div>
                 <div class="input-wrap">
-                   <input type="number" class="cfg-num" style="border-color: var(--accent);" .value="${this.config.manual_limit_value || 50}"
+                   <input type="number" class="cfg-num" style="border-color: var(--accent); flex: 1;" .value="${this.config.manual_limit_value || 50}"
                      @change="${(e) => { this.config = { ...this.config, manual_limit_value: e.target.value }; this.requestUpdate(); }}">
-                   <span class="unit-tag">${((this.config.inverter_type !== 'hoymiles' && this.config.generic_limit_type === 'watt') ? 'W' : '%')}</span>
+                   <select class="cfg-select" style="margin-left: 10px; width: auto; min-width: 60px; padding: 12px 10px;" .value="${this.config.manual_limit_type || 'percent'}"
+                     @change="${(e) => { this.config = { ...this.config, manual_limit_type: e.target.value }; this.requestUpdate(); }}">
+                      <option value="percent">%</option>
+                      <option value="watt">W</option>
+                   </select>
                 </div>
              </div>
 
