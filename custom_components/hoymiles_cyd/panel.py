@@ -12,6 +12,11 @@ from .const import DOMAIN, HASS_ZERO_EXPORT_MANAGER
 PANEL_TITLE = "Nulleinspeisung Steuerung"
 PANEL_ICON = "mdi:solar-power-variant"
 
+# In-memory registry for connected CYD displays
+# Keys: IP address, Values: {version, last_seen, update_triggered}
+CONNECTED_DISPLAYS = {}
+PENDING_UPDATES = {}
+
 from homeassistant.components.frontend import async_register_built_in_panel
 
 async def async_setup_panel(hass: HomeAssistant):
@@ -25,6 +30,8 @@ async def async_setup_panel(hass: HomeAssistant):
     hass.http.register_view(HoymilesCYDSyncView())
     hass.http.register_view(HoymilesCYDConfigView())
     hass.http.register_view(HoymilesCYDInvertersView())
+    hass.http.register_view(HoymilesCYDDisplaysView())
+    hass.http.register_view(HoymilesCYDTriggerUpdateView())
 
     # Register the custom panel in the sidebar
     async_register_built_in_panel(
@@ -219,13 +226,57 @@ class HoymilesCYDSyncView(HomeAssistantView):
             pass
 
         import time
+        now = int(time.time())
+        ip = request.remote
+        v = request.query.get("v", "unknown")
+
+        # Track display
+        CONNECTED_DISPLAYS[ip] = {
+            "version": v,
+            "last_seen": now
+        }
+
+        # Check for pending update
+        should_update = PENDING_UPDATES.pop(ip, False)
+
         data = {
             "solar": {"p": solar_p, "y": solar_y, "u_p": config.get("solar_power_unit", "W"), "u_y": config.get("solar_yield_unit", "kWh")},
             "grid": {"p": grid_p, "imp": grid_import, "exp": grid_export, "u_p": config.get("grid_power_unit", "W"), "u_e": config.get("grid_energy_unit", "kWh")},
             "bat": {"p": bat_p, "soc": bat_soc, "u_p": config.get("battery_power_unit", "W")},
             "status": ze_status,
             "version": version,
-            "ts": int(time.time())
+            "update": should_update,
+            "ts": now
         }
 
         return web.json_response(data)
+
+class HoymilesCYDDisplaysView(HomeAssistantView):
+    """View to list connected CYD displays."""
+    url = "/api/hoymiles_cyd_displays"
+    name = "api:hoymiles_cyd:displays"
+    requires_auth = False
+
+    async def get(self, request):
+        import time
+        now = int(time.time())
+        # Clean up old displays (haven't seen in 5 minutes)
+        for ip in list(CONNECTED_DISPLAYS.keys()):
+            if now - CONNECTED_DISPLAYS[ip]["last_seen"] > 300:
+                del CONNECTED_DISPLAYS[ip]
+
+        return web.json_response({"displays": CONNECTED_DISPLAYS})
+
+class HoymilesCYDTriggerUpdateView(HomeAssistantView):
+    """View to trigger an update for a specific display."""
+    url = "/api/hoymiles_cyd_trigger_update"
+    name = "api:hoymiles_cyd:trigger_update"
+    requires_auth = False
+
+    async def post(self, request):
+        data = await request.json()
+        ip = data.get("ip")
+        if ip:
+            PENDING_UPDATES[ip] = True
+            return web.json_response({"status": "ok"})
+        return web.json_response({"status": "error", "message": "No IP provided"}, status=400)

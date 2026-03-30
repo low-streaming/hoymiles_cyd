@@ -296,6 +296,9 @@ void fetch_ha_data() {
     url += "/api/hoymiles_cyd_sync";
   }
 
+  // Append current version for display tracking in HA
+  url += "?v=" + String(CURRENT_VERSION);
+
   Serial.println("--- Sync Attempt ---");
   Serial.print("Target URL: ");
   Serial.println(url);
@@ -327,6 +330,13 @@ void fetch_ha_data() {
       bat_soc = doc["bat"]["soc"];
       status_text = doc["status"].as<String>();
       is_offline = false;
+      
+      // Check if HA wants us to update
+      if (doc["update"]) {
+        Serial.println("Update trigger from Home Assistant!");
+        checkForUpdate();
+      }
+      
       Serial.println("Sync: SUCCESS");
     } else {
       Serial.print("JSON Error: ");

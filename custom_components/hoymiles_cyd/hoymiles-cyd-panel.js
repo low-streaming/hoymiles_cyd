@@ -146,6 +146,7 @@ class HoymilesCYDPanel extends LitElement {
       _availableInverters: { type: Array },
       _latestVersion: { type: String },
       _currentVersion: { type: String },
+      _connectedDisplays: { type: Object },
       _isUpdating: { type: Boolean },
       _updateStatus: { type: String }
     };
@@ -156,6 +157,7 @@ class HoymilesCYDPanel extends LitElement {
     this.activeTab = 'dashboard';
     this._latestVersion = '';
     this._currentVersion = '';
+    this._connectedDisplays = {};
     this._isUpdating = false;
     this._updateStatus = '';
     this.config = {
@@ -304,6 +306,24 @@ class HoymilesCYDPanel extends LitElement {
     }
   }
 
+  async _fetchDisplays() {
+    try {
+      const resp = await this.hass.callApi('GET', 'hoymiles_cyd_displays');
+      this._connectedDisplays = resp.displays || {};
+    } catch (e) { console.error("Failed to fetch displays", e); }
+  }
+
+  async _triggerDisplayUpdate(ip) {
+    if (!confirm(`Update für Display ${ip} wirklich starten?`)) return;
+    try {
+      await this.hass.callApi('POST', 'hoymiles_cyd_trigger_update', { ip });
+      this.dispatchEvent(new CustomEvent('hass-notification', {
+        detail: { message: "Update-Signal gesendet! Display startet gleich neu.", duration: 3000 },
+        bubbles: true, composed: true
+      }));
+    } catch (e) { alert("Signal-Senden fehlgeschlagen"); }
+  }
+
   async _runUpdate() {
     if (!confirm("Möchtest du das Update jetzt installieren? Die Integration wird dabei überschrieben.")) return;
     this._isUpdating = true;
@@ -378,13 +398,15 @@ class HoymilesCYDPanel extends LitElement {
         <div class="tabs">
           <div class="tab ${this.activeTab === 'dashboard' ? 'active' : ''}" @click="${() => this.activeTab = 'dashboard'}">DASHBOARD</div>
           <div class="tab ${this.activeTab === 'settings' ? 'active' : ''}" @click="${() => this.activeTab = 'settings'}">EINSTELLUNGEN</div>
-          <div class="tab ${this.activeTab === 'help' ? 'active' : ''}" @click="${() => this.activeTab = 'help'}">HILFE</div>
+          <div class="tab ${this.activeTab === 'display_update' ? 'active' : ''}" @click="${() => this.activeTab = 'display_update'}">DISPLAY UPDATE</div>
+          <div class="tab ${this.activeTab === 'help' ? 'active' : ''}" @click="${() => this.activeTab = 'help'}">HILFE & INFO</div>
         </div>
 
         <div class="main-content">
           ${this.activeTab === 'dashboard' ? this.renderDashboard() :
         this.activeTab === 'settings' ? this.renderSettings() :
-          this.renderHelp()}
+          this.activeTab === 'display_update' ? this.renderDisplayUpdate() :
+            this.renderHelp()}
         </div>
       </div>
     `;
@@ -1050,6 +1072,67 @@ class HoymilesCYDPanel extends LitElement {
     `;
   }
 
+  renderDisplayUpdate() {
+    const displays = Object.entries(this._connectedDisplays);
+    
+    return html`
+      <div class="dashboard-layout animate-fade-in">
+        <div class="main-card glass" style="max-width: 800px; margin: 0 auto;">
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <ha-icon icon="mdi:cellphone-link-centralized" style="font-size: 2.4em; color: var(--accent);"></ha-icon>
+            <div>
+              <h2 style="margin: 0; font-size: 1.5em; font-weight: 800; letter-spacing: 1px;">DISPLAY FIRMWARE UPDATES</h2>
+              <p style="margin: 5px 0 0; font-size: 0.85em; color: var(--text-dim);">Hier siehst du alle verbundenen CYD Solar Displays und kannst gezielt Updates anstoßen.</p>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            ${displays.length === 0 ? html`
+              <div style="text-align: center; padding: 40px; color: var(--text-dim);">
+                <ha-icon icon="mdi:wifi-off" style="font-size: 3em; opacity: 0.3; margin-bottom: 10px;"></ha-icon>
+                <p>Keine aktiven Displays im Netzwerk gefunden.<br/><small>Stelle sicher, dass dein CYD eingeschaltet und mit WLAN verbunden ist.</small></p>
+              </div>
+            ` : displays.map(([ip, data]) => {
+              const isUpToDate = data.version === this._latestVersion;
+              return html`
+                <div class="glass-card" style="padding: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid ${isUpToDate ? 'rgba(57,255,20,0.1)' : 'var(--accent)'}; background: rgba(0,0,0,0.3);">
+                  <div style="background: var(--glass-bg); padding: 12px; border-radius: 12px;">
+                    <ha-icon icon="mdi:cellphone-wireless" style="color: ${isUpToDate ? 'var(--neon-green)' : 'var(--accent)'};"></ha-icon>
+                  </div>
+                  <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                      <span style="font-weight: 700; font-size: 1.1em;">CYD Solar Display</span>
+                      <span style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.75em; color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);">
+                        <ha-icon icon="mdi:ip-network" style="font-size: 14px; margin-right: 4px;"></ha-icon>${ip}
+                      </span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--text-dim);">
+                      Installiert: <strong style="color: #fff;">${data.version}</strong> | Verfügbar: <strong style="color: var(--accent);">${this._latestVersion || '...'}</strong>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    ${isUpToDate ? html`
+                      <div style="background: rgba(57,255,20,0.1); color: var(--neon-green); padding: 6px 12px; border-radius: 8px; font-size: 0.85em; border: 1px solid var(--neon-green); display: flex; align-items: center; gap: 8px;">
+                        <ha-icon icon="mdi:check-decagram" style="font-size: 18px;"></ha-icon> Aktuell
+                      </div>
+                    ` : html`
+                      <button class="mega-save-btn" 
+                        style="padding: 10px 20px; background: var(--accent); color: #000; font-size: 0.85em; box-shadow: 0 0 15px rgba(247, 147, 26, 0.3);"
+                        @click="${() => this._triggerDisplayUpdate(ip)}">
+                        <ha-icon icon="mdi:rocket-launch" style="font-size: 18px; margin-right: 8px;"></ha-icon>UPDATE STARTEN
+                      </button>
+                    `}
+                  </div>
+                </div>
+              `;
+            })}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   renderHelp() {
     return html`
       <div class="help-page glass animate-fade-in">
@@ -1120,16 +1203,12 @@ class HoymilesCYDPanel extends LitElement {
           </div>
 
           <div class="help-section">
-            <h4><ha-icon icon="mdi:update"></ha-icon> 8. SYSTEM & UPDATE</h4>
+            <h4><ha-icon icon="mdi:update"></ha-icon> 8. HASS-INTEGRATION UPDATE</h4>
             <div class="glass-card" style="padding: 20px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div>
                         <div style="font-size: 0.9em; color: var(--text-dim);">Aktuelle Version</div>
                         <div style="font-size: 1.2em; font-weight: 700; color: #fff;">v${this._currentVersion}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.9em; color: var(--text-dim);">Latest GitHub</div>
-                        <div style="font-size: 1.2em; font-weight: 700; color: var(--accent);">v${this._latestVersion || '...'}</div>
                     </div>
                 </div>
 
