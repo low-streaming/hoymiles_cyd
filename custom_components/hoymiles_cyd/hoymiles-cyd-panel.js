@@ -130,8 +130,6 @@ class HoymilesEntityPicker extends LitElement {
       .item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
       .item:hover { background: rgba(247, 147, 26, 0.1); }
       .item.selected { border-left: 3px solid var(--kairo-gold); background: rgba(247, 147, 26, 0.1); }
-      .name { font-size: 0.9em; font-weight: bold; color: #fff; }
-      .id { font-size: 0.7em; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
       .empty { padding: 20px; text-align: center; color: var(--text-dim); }
     `;
   }
@@ -144,26 +142,34 @@ class HoymilesCYDPanel extends LitElement {
       hass: { type: Object },
       activeTab: { type: String },
       config: { type: Object },
-      _historyData: { type: Array },
+      _historyData: { type: Object },
       _availableInverters: { type: Array },
       _latestVersion: { type: String },
       _currentVersion: { type: String },
       _connectedDisplays: { type: Object },
       _isUpdating: { type: Boolean },
       _updateStatus: { type: String },
-      _sunPos: { type: Number }
+      _sunPos: { type: Number },
+      _decisionLog: { type: Array },
+      _savedWh: { type: Number },
+      _expertMode: { type: Boolean },
+      activeSubTab: { type: String }
     };
   }
 
   constructor() {
     super();
     this.activeTab = 'dashboard';
+    this.activeSubTab = 'general';
     this._latestVersion = '';
     this._currentVersion = '';
     this._connectedDisplays = {};
     this._isUpdating = false;
     this._updateStatus = '';
-    this._sunPos = -1; // -1 = night, 0-1 = day progress
+    this._sunPos = 0;
+    this._decisionLog = [];
+    this._savedWh = 0;
+    this._expertMode = false;
     this.config = {
       grid_sensor: '',
       grid_energy_import_sensor: '',
@@ -191,7 +197,7 @@ class HoymilesCYDPanel extends LitElement {
       sub_consumer_3_name: '', sub_consumer_3_sensor: '', sub_consumer_3_icon: 'mdi:power-plug', sub_consumer_3_toggle: '', sub_consumer_3_use_as_load: false,
       sub_consumer_4_name: '', sub_consumer_4_sensor: '', sub_consumer_4_icon: 'mdi:power-plug', sub_consumer_4_toggle: '', sub_consumer_4_use_as_load: false
     };
-    this._historyData = [];
+    this._historyData = { grid: [], solar: [], battery: [] };
     this._configLoaded = false;
     this._availableInverters = [];
     this._updateEventUnsub = null;
@@ -223,12 +229,16 @@ class HoymilesCYDPanel extends LitElement {
     await this._loadConfig();
     await this._loadInverters();
     this._configLoaded = true;
-    this._fetchHistory();
-    this._checkUpdate();
-    this._fetchDisplays(); // Initial fetch of connected displays
-    
     if (this._historyInterval) clearInterval(this._historyInterval);
-    this._historyInterval = setInterval(() => this._fetchHistory(), 60000);
+    this._historyInterval = setInterval(() => {
+      this._fetchHistory();
+      this._fetchLog();
+    }, 60000);
+
+    // Initial fetch
+    this._fetchHistory();
+    this._fetchLog();
+    this._fetchDisplays();
 
     // Refresh display list every 10 seconds
     setInterval(() => this._fetchDisplays(), 10000);
@@ -336,6 +346,21 @@ class HoymilesCYDPanel extends LitElement {
     }
   }
 
+  async _fetchLog() {
+    try {
+      const data = await this.hass.callApi('GET', 'hoymiles_cyd_sync');
+      console.log("Log synchronization data:", data);
+      if (data) {
+        this._decisionLog = data.log || data.history || [];
+        this._savedWh = data.saved_wh || data.energy_saved || 0;
+        this.requestUpdate();
+      }
+    } catch (e) {
+      console.error("Error fetching log data:", e);
+    }
+  }
+
+
   async _fetchDisplays() {
     try {
       const resp = await this.hass.callApi('GET', 'hoymiles_cyd_displays');
@@ -381,16 +406,29 @@ class HoymilesCYDPanel extends LitElement {
   }
 
   async _fetchHistory() {
-    if (!this.config.grid_sensor) return;
+    const sensors = [this.config.grid_sensor, this.config.solar_power_sensor, this.config.battery_power_sensor].filter(Boolean);
+    if (sensors.length === 0) return;
     try {
       const end = new Date();
       const start = new Date(end.getTime() - 3600000);
-      const result = await this.hass.callApi(
-        'GET',
-        `history/period/${start.toISOString()}?filter_entity_id=${this.config.grid_sensor}&end_time=${end.toISOString()}`
-      );
-      if (result && result.length > 0) { this._historyData = result[0]; }
-    } catch (e) { console.error(e); }
+      const url = `history/period/${start.toISOString()}?filter_entity_id=${sensors.join(',')}&end_time=${end.toISOString()}`;
+      const result = await this.hass.callApi('GET', url);
+      
+      const historyObj = { grid: [], solar: [], battery: [] };
+      if (result && Array.isArray(result)) {
+        result.forEach((entityHistory, idx) => {
+          if (entityHistory && entityHistory.length > 0) {
+            const entityId = entityHistory[0].entity_id;
+            // Map by entity_id if available, otherwise by index fallback
+            if (entityId === this.config.grid_sensor || (!entityId && idx === 0)) historyObj.grid = entityHistory;
+            else if (entityId === this.config.solar_power_sensor || (!entityId && idx === 1)) historyObj.solar = entityHistory;
+            else if (entityId === this.config.battery_power_sensor || (!entityId && idx === 2)) historyObj.battery = entityHistory;
+          }
+        });
+        console.log("History synchronized:", Object.keys(historyObj).map(k => `${k}: ${historyObj[k].length} pts`));
+        this._historyData = historyObj;
+      }
+    } catch (e) { console.error("History fetch failed", e); }
   }
 
   async _saveConfig() {
@@ -432,17 +470,26 @@ class HoymilesCYDPanel extends LitElement {
           </div>
         </div>
 
-        <div class="tabs">
-          <div class="tab ${this.activeTab === 'dashboard' ? 'active' : ''}" @click="${() => this.activeTab = 'dashboard'}">DASHBOARD</div>
-          <div class="tab ${this.activeTab === 'settings' ? 'active' : ''}" @click="${() => this.activeTab = 'settings'}">EINSTELLUNGEN</div>
-          <div class="tab ${this.activeTab === 'display_update' ? 'active' : ''}" @click="${() => this.activeTab = 'display_update'}">DISPLAY UPDATE</div>
-          <div class="tab ${this.activeTab === 'help' ? 'active' : ''}" @click="${() => this.activeTab = 'help'}">HILFE & INFO</div>
+        <div class="main-nav glass">
+          <div class="nav-item ${this.activeTab === 'dashboard' ? 'active' : ''}" @click="${() => this.activeTab = 'dashboard'}">
+            <ha-icon icon="mdi:view-dashboard-outline"></ha-icon> DASHBOARD
+          </div>
+          <div class="nav-item ${this.activeTab === 'analyse' ? 'active' : ''}" @click="${() => this.activeTab = 'analyse'}">
+            <ha-icon icon="mdi:chart-timeline-variant"></ha-icon> ANALYSE
+          </div>
+          <div class="nav-item ${this.activeTab === 'settings' ? 'active' : ''}" @click="${() => this.activeTab = 'settings'}">
+            <ha-icon icon="mdi:cog-outline"></ha-icon> SETUP
+          </div>
+          <div class="nav-item ${this.activeTab === 'display' ? 'active' : ''}" @click="${() => this.activeTab = 'display'}">
+            <ha-icon icon="mdi:monitor-dashboard"></ha-icon> DISPLAYS
+          </div>
         </div>
 
         <div class="main-content">
           ${this.activeTab === 'dashboard' ? this.renderDashboard() :
-        this.activeTab === 'settings' ? this.renderSettings() :
-          this.activeTab === 'display_update' ? this.renderDisplayUpdate() :
+            this.activeTab === 'analyse' ? this.renderAnalyse() :
+            this.activeTab === 'settings' ? this.renderSettings() :
+            this.activeTab === 'display' ? this.renderDisplayUpdate() :
             this.renderHelp()}
         </div>
       </div>
@@ -462,7 +509,8 @@ class HoymilesCYDPanel extends LitElement {
 
     // Current Power (Watts)
     const solar_p = getScaled(this.config.solar_power_sensor || 'sensor.hoymiles_cyd_ac_power', this.config.solar_power_scale);
-    const batt_p = getScaled(this.config.battery_power_sensor, this.config.battery_power_scale);
+    let batt_p = getScaled(this.config.battery_power_sensor, this.config.battery_power_scale);
+    if (this.config.battery_power_invert) batt_p = batt_p * -1;
 
     let grid_p = 0;
     let house_consumption = 0;
@@ -547,23 +595,25 @@ class HoymilesCYDPanel extends LitElement {
                 <path id="p_inv_house" d="M 300 210 Q 300 100 480 100" class="pth" />
                 <path id="p_grid_inv" d="M 120 320 Q 300 320 300 210" class="pth" />
                 <path id="p_inv_batt" d="M 300 210 Q 300 320 480 320" class="pth" />
-                
-                <!-- Particle Flows -->
-                ${this._renderFlowParticles('M 120 100 Q 300 100 300 210', solar_p, 'neon-orange-glow')}
-                ${this._renderFlowParticles('M 300 210 Q 300 100 480 100', house_consumption, 'neon-blue-glow')}
-                
-                ${grid_p > 20 ? this._renderFlowParticles('M 120 320 Q 300 320 300 210', grid_p, 'neon-pink-glow') : ''}
-                ${grid_p < -20 ? this._renderFlowParticles('M 300 210 Q 300 320 120 320', Math.abs(grid_p), 'neon-cyan-glow') : ''}
-                
-                ${batt_p > 20 ? this._renderFlowParticles('M 300 210 Q 300 320 480 320', batt_p, 'neon-green-glow') : ''}
-                ${batt_p < -20 ? this._renderFlowParticles('M 480 320 Q 300 320 300 210', Math.abs(batt_p), 'neon-green-glow') : ''}
+                <path id="p_inv_grid" d="M 300 210 Q 300 320 120 320" style="fill:none;" />
+                <path id="p_batt_inv" d="M 480 320 Q 300 320 300 210" style="fill:none;" />
               </svg>
 
+              <!-- CSS Particle Layer (Immune to SVG bugs) -->
+              <div class="particle-layer">
+                 ${solar_p > 10 ? this._renderCSSFlow('M 120 100 Q 300 100 300 210', solar_p, '#F7931A') : ''}
+                 ${house_consumption > 10 ? this._renderCSSFlow('M 300 210 Q 300 100 480 100', house_consumption, '#00f2ff') : ''}
+                 ${grid_p > 10 ? this._renderCSSFlow('M 120 320 Q 300 320 300 210', grid_p, '#ff007f') : ''}
+                 ${grid_p < -10 ? this._renderCSSFlow('M 300 210 Q 300 320 120 320', Math.abs(grid_p), '#00f2ff') : ''}
+                 ${batt_p > 10 ? this._renderCSSFlow('M 300 210 Q 300 320 480 320', batt_p, '#39FF14') : ''}
+                 ${batt_p < -10 ? this._renderCSSFlow('M 480 320 Q 300 320 300 210', Math.abs(batt_p), '#39FF14') : ''}
+              </div>
+
               <!-- Center Hub -->
-              <div class="inverter-hub">
-                <span class="hub-label">WR-LIMIT</span>
-                <span class="hub-value">${control_limit}<span class="hub-unit">%</span></span>
-                <span class="hub-status">${solar_p > 5 ? 'ERZEUGUNG' : 'STANDBY'}</span>
+              <div class="inverter-hub ${grid_p > 20 ? 'import' : grid_p < -20 ? 'export' : 'balanced'}">
+                <span class="hub-label">NETZ-BILANZ</span>
+                <span class="hub-value">${Math.abs(grid_p).toFixed(0)}<span class="hub-unit">W</span></span>
+                <span class="hub-status" style="background: rgba(255,255,255,0.05); color: #fff;">LIMIT: ${control_limit === 'unknown' ? '--' : control_limit}%</span>
               </div>
 
               <!-- Nodes -->
@@ -588,7 +638,7 @@ class HoymilesCYDPanel extends LitElement {
                    <div class="batt-bar-fill" style="height: ${battery_soc}%"></div>
                 </div>
                 <div class="soc-tag neon-bg-green">${battery_soc.toFixed(0)}%</div>
-                ${Math.abs(batt_p) > 5 ? html`<div class="power-tag neon-bg-green" style="bottom: -25px;">${batt_p > 0 ? 'LADEN' : 'ENTLADEN'}</div>` : ''}
+                ${Math.abs(batt_p) > 5 ? html`<div class="power-tag neon-bg-green" style="bottom: -25px;">${formatPower(Math.abs(batt_p))} ${batt_p > 0 ? 'LADEN' : 'ENTLADEN'}</div>` : ''}
               </div>
 
               <!-- Sub Consumers Area -->
@@ -619,18 +669,7 @@ class HoymilesCYDPanel extends LitElement {
             </div>
           </div>
 
-          <div class="graph-area">
-             <div class="graph-info">
-               <span>NETZ-LEISTUNGSVERLAUF (1h)</span>
-               <span class="range">Echtzeit</span>
-             </div>
-             <div class="canvas">
-                <svg viewBox="0 0 500 120" preserveAspectRatio="none">
-                  <path d="${this._generateGraphPath(true)}" class="area-f" />
-                  <path d="${this._generateGraphPath()}" class="line-f" />
-                </svg>
-             </div>
-          </div>
+
         </div>
 
         <div class="sidebar">
@@ -640,8 +679,9 @@ class HoymilesCYDPanel extends LitElement {
               <div class="s-icon orange"><ha-icon icon="mdi:shield-check-outline"></ha-icon></div>
               <div class="s-vals">
                 <div class="s-row"><span>Status</span> <span class="green">AKTIV</span></div>
-                <div class="s-row"><span>WR Temp</span> <span>${inverter_temp}°C</span></div>
-                <div class="s-row"><span>DTU Version</span> <span>${this._currentVersion}</span></div>
+                ${inverter_temp !== '--' ? html`<div class="s-row"><span>WR Temp</span> <span>${inverter_temp}°C</span></div>` : ''}
+                ${(this.config.inverter_type === 'hoymiles' && this._currentVersion) ? html`<div class="s-row"><span>DTU Version</span> <span>${this._currentVersion}</span></div>` : ''}
+                ${(!this.config.inverter_type.includes('hoymiles') && this._currentVersion) ? html`<div class="s-row"><span>Version</span> <span>${this._currentVersion}</span></div>` : ''}
               </div>
             </div>
           </div>
@@ -651,8 +691,18 @@ class HoymilesCYDPanel extends LitElement {
             <div class="s-flex">
               <div class="s-icon"><ha-icon icon="mdi:finance"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Autarkie</span> <span class="green">${Math.min(100, (yield_today / (import_today + yield_today - export_today + 0.001) * 100)).toFixed(1)}%</span></div>
-                <div class="s-row"><span>Eigenverbrauch</span> <span>${Math.min(100, ((yield_today - export_today) / (yield_today + 0.001) * 100)).toFixed(1)}%</span></div>
+                <div class="s-row"><span>Autarkie</span> <span class="green">${(import_today + yield_today - export_today) > 0.1 ? Math.max(0, Math.min(100, ((yield_today - export_today) / (import_today + yield_today - export_today) * 100))).toFixed(1) : '0.0'}%</span></div>
+                <div class="s-row"><span>Eigenverbrauch</span> <span class="green">${yield_today > 0.1 ? Math.max(0, Math.min(100, ((yield_today - export_today) / yield_today * 100))).toFixed(1) : '0.0'}%</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="side-card glass" style="border-color: var(--kairo-gold); margin-top: 15px;">
+            <div class="s-cap">ERSPARNIS (GESCHÄTZT)</div>
+            <div class="s-flex">
+              <div class="s-icon" style="color: var(--kairo-gold);"><ha-icon icon="mdi:piggy-bank-outline"></ha-icon></div>
+              <div class="s-vals">
+                <div class="s-row"><span>Gespart</span> <span style="color: var(--kairo-gold); font-weight: 700;">${(this._savedWh / 1000).toFixed(2)} kWh</span></div>
+                <div class="s-row"><span>Wert (30ct)</span> <span style="color: #fff;">${((this._savedWh / 1000) * 0.30).toFixed(2)} €</span></div>
               </div>
             </div>
           </div>
@@ -684,29 +734,103 @@ class HoymilesCYDPanel extends LitElement {
     `;
   }
 
-  _renderFlowParticles(path, power, colorClass) {
-    if (power < 10) return '';
-    
-    // Speed based on power
-    const dur = Math.max(0.5, 4 - (power / 500));
-    const count = Math.min(6, Math.ceil(power / 100));
-    
+  _renderCSSFlow(path, power, color) {
+    const dur = Math.max(1, 6 - (Math.log10(power + 1) * 2));
+    const count = Math.min(8, Math.max(2, Math.ceil(power / 100)));
     return html`
-      <g>
+      <div class="flow-group" style="pointer-events: none;">
         ${Array.from({ length: count }).map((_, i) => html`
-          <circle r="3" class="particle ${colorClass}" filter="url(#neonGlow)">
-            <animateMotion dur="${dur}s" repeatCount="indefinite" path="${path}" begin="${i * (dur/count)}s" />
-          </circle>
+          <div class="flow-particle"
+            style="offset-path: path('${path}'); 
+                   background: ${color};
+                   box-shadow: 0 0 10px ${color};
+                   animation: flow ${dur}s linear infinite; 
+                   animation-delay: -${(i * (dur/count)).toFixed(2)}s;">
+          </div>
         `)}
-      </g>
+      </div>
     `;
   }
 
+  _generateStackedPaths() {
+    const w = 500, h = 120;
+    const points = 50; // Resolution
+    const now = new Date().getTime();
+    const startTime = now - 3600000;
+    
+    const getValAt = (history, time) => {
+      if (!history || !Array.isArray(history) || history.length === 0) return 0;
+      // Find closest state before or at time
+      const entry = history.slice().reverse().find(e => {
+        const t_str = e.last_changed || e.last_updated || e.lu;
+        return t_str ? new Date(t_str).getTime() <= time : false;
+      });
+      if (!entry) {
+        // If no entry before this time, use the first available one as fallback
+        const first = history[0];
+        return parseFloat(first.state || first.s) || 0;
+      }
+      return parseFloat(entry.state || entry.s) || 0;
+    };
+
+    const solarData = [], battData = [], gridData = [];
+    for (let i = 0; i < points; i++) {
+      const t = startTime + (i / (points - 1)) * 3600000;
+      let s = Math.max(0, getValAt(this._historyData.solar, t));
+      
+      let b_raw = getValAt(this._historyData.battery, t);
+      if (this.config.battery_power_invert) b_raw = b_raw * -1;
+      let b = Math.max(0, b_raw * -1); // Discharge is now positive
+      
+      let g = Math.max(0, getValAt(this._historyData.grid, t)); 
+      
+      solarData.push(s);
+      battData.push(b);
+      gridData.push(g);
+    }
+
+    const maxTotal = Math.max(...solarData.map((s, i) => s + battData[i] + gridData[i]), 1);
+    const scale = isFinite(h / maxTotal) ? h / maxTotal : 1;
+
+    const createPath = (data, offsetData = null) => {
+      let pts = data.map((v, i) => {
+        const x = (i / (points - 1)) * w;
+        const base = offsetData ? offsetData[i] : 0;
+        const y = h - (v + base) * scale;
+        return `${x},${y}`;
+      });
+      
+      let p = `M ${pts[0]}`;
+      pts.forEach(pt => p += ` L ${pt}`);
+      
+      // Close for fill
+      if (offsetData) {
+        let revOffset = offsetData.map((v, i) => {
+          const x = (i / (points - 1)) * w;
+          const y = h - v * scale;
+          return `${x},${y}`;
+        }).reverse();
+        revOffset.forEach(pt => p += ` L ${pt}`);
+      } else {
+        p += ` L ${w},${h} L 0,${h}`;
+      }
+      return p + " Z";
+    };
+
+    // Layer 1: Solar (Bottom)
+    const p1 = createPath(solarData);
+    // Layer 2: Battery (on top of Solar)
+    const p2 = createPath(battData, solarData);
+    // Layer 3: Grid (on top of Solar + Battery)
+    const p3 = createPath(gridData, solarData.map((s, i) => s + battData[i]));
+
+    return { p1, p2, p3 };
+  }
 
   _generateGraphPath(fill = false) {
-    if (!this._historyData || this._historyData.length < 2) return "";
+    if (!this._historyData || !this._historyData.grid || this._historyData.grid.length < 2) return "";
     const w = 500, h = 120;
-    const data = this._historyData.map(d => parseFloat(d.s) || 0);
+    const data = this._historyData.grid.map(d => parseFloat(d.s || d.state) || 0);
     const maxV = Math.max(...data, 100);
     const minV = Math.min(...data, -100);
     const range = Math.max(1, maxV - minV);
@@ -716,498 +840,396 @@ class HoymilesCYDPanel extends LitElement {
     return p;
   }
 
+  renderAnalyse() {
+    return html`
+      <div class="analyse-page animate-fade-in">
+        <div class="setup-header">
+           <div class="setup-title">S_ANALYSE: PERFORMANCE</div>
+           <div class="setup-step">Auswertung der Regler-Effizienz und Einsparungen.</div>
+        </div>
+
+        <div class="config-grid">
+           <!-- Big Graph -->
+           <div class="config-section glass" style="grid-column: span 2;">
+               <div class="section-title"><ha-icon icon="mdi:chart-bell-curve-cumulative"></ha-icon> ENERGIE-BILANZ (LETZTE STUNDE)</div>
+               <div class="canvas" style="height: 250px; margin-top: 20px;">
+                  <svg viewBox="0 0 500 120" preserveAspectRatio="none" style="height: 100%; width: 100%;">
+                     <defs>
+                        <linearGradient id="gradSolar" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="0%" stop-color="#F7931A" stop-opacity="0.8" />
+                           <stop offset="100%" stop-color="#F7931A" stop-opacity="0.2" />
+                        </linearGradient>
+                        <linearGradient id="gradBatt" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="0%" stop-color="#2ecc71" stop-opacity="0.8" />
+                           <stop offset="100%" stop-color="#2ecc71" stop-opacity="0.2" />
+                        </linearGradient>
+                        <linearGradient id="gradGrid" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="0%" stop-color="#ff007f" stop-opacity="0.8" />
+                           <stop offset="100%" stop-color="#ff007f" stop-opacity="0.2" />
+                        </linearGradient>
+                     </defs>
+                     ${(() => {
+                        const { p1, p2, p3 } = this._generateStackedPaths();
+                        const hasData = this._historyData.grid.length > 0 || this._historyData.solar.length > 0;
+                        if (!hasData) return html`<text x="250" y="65" fill="var(--text-dim)" text-anchor="middle" font-size="20">Synchronisiere Verlaufsdaten...</text>`;
+                        return html`
+                          <path d="${p1}" fill="url(#gradSolar)" style="transition: 0.5s;" />
+                          <path d="${p2}" fill="url(#gradBatt)" style="transition: 0.5s;" />
+                          <path d="${p3}" fill="url(#gradGrid)" style="transition: 0.5s;" />
+                        `;
+                     })()}
+                  </svg>
+               </div>
+               <div style="display: flex; justify-content: center; gap: 30px; margin-top: 20px;">
+                  <div class="leg-item"><div class="dot" style="background: #F7931A;"></div> SOLAR</div>
+                  <div class="leg-item"><div class="dot" style="background: #2ecc71;"></div> BATTERIE</div>
+                  <div class="leg-item"><div class="dot" style="background: #ff007f;"></div> NETZ</div>
+               </div>
+               <div style="display: flex; justify-content: space-between; margin-top: 15px; color: var(--text-dim); font-size: 0.7em; letter-spacing: 1px;">
+                  <span>VOR 1 STUNDE</span>
+                  <span>JETZT</span>
+               </div>
+            </div>
+
+           <!-- Savings Detail -->
+           <div class="config-section glass">
+              <div class="section-title"><ha-icon icon="mdi:piggy-bank"></ha-icon> ERSPARNIS</div>
+              <div style="text-align: center; padding: 30px 10px;">
+                 <div style="font-size: 3em; font-weight: 900; color: var(--kairo-gold); filter: drop-shadow(0 0 10px rgba(247, 147, 26, 0.3));">
+                    ${(this._savedWh / 1000).toFixed(2)}<span style="font-size: 0.4em; margin-left: 5px;">kWh</span>
+                 </div>
+                 <div style="color: var(--text-dim); font-size: 0.8em; margin-top: 5px; letter-spacing: 2px;">GESAMT EINGESPART</div>
+                 
+                 <div style="margin-top: 30px; display: flex; justify-content: space-around; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+                    <div>
+                       <div style="font-size: 1.2em; font-weight: bold;">${((this._savedWh / 1000) * 0.30).toFixed(2)} €</div>
+                       <div style="font-size: 0.6em; color: var(--text-dim);">WERT (30ct)</div>
+                    </div>
+                    <div>
+                       <div style="font-size: 1.2em; font-weight: bold; color: var(--neon-green);">${(this._savedWh * 0.4).toFixed(0)}g</div>
+                       <div style="font-size: 0.6em; color: var(--text-dim);">CO2 REDUKTION</div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+
+           <!-- Decision Log Card -->
+           <div class="config-section glass" style="grid-column: span 1;">
+              <div class="section-title" style="color: var(--kairo-cyan);"><ha-icon icon="mdi:clipboard-pulse-outline"></ha-icon> REGLER-ENTSCHEIDUNGEN</div>
+              <div class="log-container" style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; max-height: 250px; overflow-y: auto;">
+                 ${this._decisionLog.length === 0 ? html`<div style="color: var(--text-dim); text-align: center; padding: 20px;">Warte auf Daten...</div>` : ''}
+                 ${this._decisionLog.map(entry => {
+                   const [time, action, reason] = entry.split(' | ');
+                   return html`
+                     <div style="display: flex; gap: 15px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 4px;">
+                       <span style="color: var(--text-dim); min-width: 80px;">${time}</span>
+                       <span style="color: var(--kairo-cyan); min-width: 80px; font-weight: bold;">${action}</span>
+                       <span style="color: #fff; flex: 1; font-size: 0.9em;">${reason}</span>
+                     </div>
+                   `;
+                 })}
+              </div>
+           </div>
+        </div>
+      </div>
+    `;
+  }
+
   renderSettings() {
     return html`
       <div class="settings-page animate-fade-in">
         <div class="setup-header">
-           <div class="setup-title">S_SETUP: KONFIGURATION</div>
-           <div class="setup-step">Schritt-für-Schritt Einrichtung für optimale Nulleinspeisung.</div>
+           <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <div>
+                <div class="setup-title">S_SETUP: KONFIGURATION</div>
+                <div class="setup-step">Schritt-für-Schritt Einrichtung für optimale Nulleinspeisung.</div>
+              </div>
+              <div class="glass" style="padding: 10px 20px; border-radius: 12px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--glass-border);">
+                 <span style="font-size: 0.8em; font-weight: bold; color: var(--text-dim); letter-spacing: 1px;">EXPERTEN-MODUS</span>
+                 <ha-switch .checked="${this._expertMode}" @change="${(e) => this._expertMode = e.target.checked}"></ha-switch>
+              </div>
+           </div>
         </div>
 
-        <!-- STEUERUNG & SYSTEM -->
+        <div class="sub-nav">
+           <div class="sub-item ${this.activeSubTab === 'general' ? 'active' : ''}" @click="${() => this.activeSubTab = 'general'}">Allgemein</div>
+           <div class="sub-item ${this.activeSubTab === 'sensors' ? 'active' : ''}" @click="${() => this.activeSubTab = 'sensors'}">Sensoren</div>
+           <div class="sub-item ${this.activeSubTab === 'algorithm' ? 'active' : ''}" @click="${() => this.activeSubTab = 'algorithm'}">Regelung</div>
+           <div class="sub-item ${this.activeSubTab === 'safety' ? 'active' : ''}" @click="${() => this.activeSubTab = 'safety'}">Schutz</div>
+           <div class="sub-item ${this.activeSubTab === 'devices' ? 'active' : ''}" @click="${() => this.activeSubTab = 'devices'}">Geräte</div>
+        </div>
+
         <div class="config-grid">
-          <div class="config-section glass">
-             <div class="section-title"><ha-icon icon="mdi:tune-vertical"></ha-icon> STEUERUNG</div>
-             
-             <div class="cfg-row">
-                <div class="cfg-info">
-                   <div class="cfg-label">Automatisierung</div>
-                   <div class="cfg-desc">Nulleinspeisung ein- oder ausschalten.</div>
-                </div>
-                <ha-switch .checked="${this.config.is_enabled || false}"
-                  @change="${(e) => { this.config = { ...this.config, is_enabled: e.target.checked }; this._handleSwitchChange(e.target.checked); }}"></ha-switch>
-             </div>
-
-             <div class="cfg-row">
-                <div class="cfg-info">
-                   <div class="cfg-label">Betriebsmodus</div>
-                   <div class="cfg-desc">ZEN = Automatisch, Manuell = Fester Wert.</div>
-                </div>
-                <select class="cfg-select" .value="${this.config.operation_mode || 'zero_export'}"
-                  @change="${(e) => this.config = { ...this.config, operation_mode: e.target.value }}">
-                   <option value="zero_export">ZEN (Automatik)</option>
-                   <option value="base_load">Grundlast (Plugs)</option>
-                   <option value="manual_limit">Manuell</option>
-                   <option value="disabled">Inaktiv</option>
-                </select>
-             </div>
-
-             <div class="cfg-row animate-fade-in" style="display: ${this.config.operation_mode === 'manual_limit' ? 'flex' : 'none'}; border-left: 3px solid var(--accent); padding-left: 15px; background: rgba(247, 147, 26, 0.05); margin-top: -10px; margin-bottom: 20px; border-radius: 0 8px 8px 0;">
-                <div class="cfg-info">
-                   <div class="cfg-label" style="color: var(--accent);">Manuelles Limit</div>
-                   <div class="cfg-desc">Trage hier den festen Wert ein, der statisch an den Wechselrichter gesendet werden soll.</div>
-                </div>
-                <div class="input-wrap">
-                   <input type="number" class="cfg-num" style="border-color: var(--accent); flex: 1;" .value="${this.config.manual_limit_value || 50}"
-                     @change="${(e) => { this.config = { ...this.config, manual_limit_value: e.target.value }; this.requestUpdate(); }}">
-                   <select class="cfg-select" style="margin-left: 10px; width: auto; min-width: 60px; padding: 12px 10px;" .value="${this.config.manual_limit_type || 'percent'}"
-                     @change="${(e) => { this.config = { ...this.config, manual_limit_type: e.target.value }; this.requestUpdate(); }}">
-                      <option value="percent">%</option>
-                      <option value="watt">W</option>
-                   </select>
-                </div>
-             </div>
-
-             <div class="cfg-row">
-                <div class="cfg-info">
-                   <div class="cfg-label">Hardware-System</div>
-                   <div class="cfg-desc">Welches Gerät wird gesteuert?</div>
-                </div>
-                <select class="cfg-select" .value="${this.config.inverter_type || 'hoymiles'}"
-                  @change="${(e) => this.config = { ...this.config, inverter_type: e.target.value }}">
-                   <option value="hoymiles">Hoymiles (DTU)</option>
-                   <option value="opendtu">OpenDTU / AhoyDTU</option>
-                   <option value="generic">Anderes (EZ1/HA)</option>
-                </select>
-             </div>
-
-             ${this.config.inverter_type === 'hoymiles' ? html`
-                <div class="cfg-row">
-                   <div class="cfg-info">
-                      <div class="cfg-label">Ziel-Inverter</div>
-                      <div class="cfg-desc">Alle oder spezifische Seriennummer.</div>
-                   </div>
-                   <select class="cfg-select" .value="${this.config.selected_inverter || 'all'}"
-                     @change="${(e) => this.config = { ...this.config, selected_inverter: e.target.value }}">
-                      <option value="all">Alle Geräte</option>
-                      ${this._availableInverters.map(sn => html`<option value="${sn}">${sn}</option>`)}
-                   </select>
-                </div>
-             ` : html`
-                <div class="cfg-row column">
-                   <div class="cfg-info">
-                      <div class="cfg-label">External Limit Entity</div>
-                   </div>
-                   <hoymiles-entity-picker .hass="${this.hass}" label="Number / Limit Entity" .value="${this.config.external_limit_entity}" domain="number,input_number"
-                     @value-changed="${(e) => this.config = { ...this.config, external_limit_entity: e.detail.value }}"></hoymiles-entity-picker>
-                </div>
-                <div class="cfg-row">
-                   <div class="cfg-info">
-                      <div class="cfg-label">Limit Einheit</div>
-                   </div>
-                   <select class="cfg-select" .value="${this.config.generic_limit_type || 'watt'}"
-                     @change="${(e) => this.config = { ...this.config, generic_limit_type: e.target.value }}">
-                      <option value="watt">Watt (W)</option>
-                      <option value="percent">Prozent (%)</option>
-                   </select>
-                </div>
-             `}
-          </div>
-
-          <!-- INTELLIGENZ & LIMITS -->
-          <div class="config-section glass">
-             <div class="section-title"><ha-icon icon="mdi:brain"></ha-icon> INTELLIGENZ</div>
-             
-             <div class="cfg-row">
-                <div class="cfg-info">
-                   <div class="cfg-label">Ziel-Bezug am Zähler</div>
-                   <div class="cfg-desc">Gewünschter Wert in Watt (z.B. 10W Netzbezug).</div>
-                </div>
-                <div class="input-wrap">
-                   <input type="number" class="cfg-num" .value="${this.config.target_grid_watt || 0}"
-                     @change="${(e) => this.config = { ...this.config, target_grid_watt: e.target.value }}">
-                   <span class="unit-tag">W</span>
-                </div>
-             </div>
-
-             <div class="cfg-row">
-                <div class="cfg-info">
-                   <div class="cfg-label">Maximale Kapazität</div>
-                   <div class="cfg-desc">Max. AC-Leistung aller WR (z.B. 800W).</div>
-                </div>
-                <div class="input-wrap">
-                   <input type="number" class="cfg-num" .value="${this.config.max_capacity || 800}"
-                     @change="${(e) => this.config = { ...this.config, max_capacity: e.target.value }}">
-                   <span class="unit-tag">W</span>
-                </div>
-             </div>
-
-             <div class="cfg-row">
-                <div class="cfg-info">
-                   <div class="cfg-label">Minimale Einspeisung (Limit)</div>
-                   <div class="cfg-desc">Das Minimum in %, auf das der WR in der Automatik regelt (z.B. 10%).</div>
-                </div>
-                <div class="input-wrap">
-                   <input type="number" class="cfg-num" .value="${this.config.min_limit || 10}"
-                     @change="${(e) => this.config = { ...this.config, min_limit: e.target.value }}">
-                   <span class="unit-tag">%</span>
-                </div>
-             </div>
-
-             <div class="cfg-row">
-                <div class="cfg-info">
-                   <div class="cfg-label">Maximale Einspeisung (Limit)</div>
-                   <div class="cfg-desc">Das Maximum in %, auf das der WR in der Automatik regelt (z.B. 100%).</div>
-                </div>
-                <div class="input-wrap">
-                   <input type="number" class="cfg-num" .value="${this.config.max_limit || 100}"
-                     @change="${(e) => this.config = { ...this.config, max_limit: e.target.value }}">
-                    <span class="unit-tag">%</span>
-                 </div>
-              </div>
-
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Hysterese (Regel-Schwelle)</div>
-                    <div class="cfg-desc">Leistungsdifferenz in Watt, ab der erst geregelt wird (Regler-Schonung).</div>
-                 </div>
-                 <div class="input-wrap">
-                    <input type="number" class="cfg-num" .value="${this.config.zero_export_hysteresis || 5}"
-                      @change="${(e) => this.config = { ...this.config, zero_export_hysteresis: e.target.value }}">
-                    <span class="unit-tag">W</span>
-                 </div>
-              </div>
-
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Regel-Intervall (Bereich)</div>
-                    <div class="cfg-desc">Intervall passt sich an. Min für schnelle Reaktion, Max für Hardware-Schonung.</div>
-                 </div>
-                 <div class="input-wrap" style="flex-direction: row; gap: 10px;">
-                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_min_interval || 5}"
-                      @change="${(e) => this.config = { ...this.config, zero_export_min_interval: e.target.value }}">
-                    <span>bis</span>
-                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_max_interval || 60}"
-                      @change="${(e) => this.config = { ...this.config, zero_export_max_interval: e.target.value }}">
-                    <span class="unit-tag">s</span>
-                 </div>
-              </div>
-
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Sanftanlauf (Ramp-Rate)</div>
-                    <div class="cfg-desc">Max. Leistungsänderung pro Sekunde (W/s). Verhindert extreme Sprünge.</div>
-                 </div>
-                 <div class="input-wrap">
-                    <input type="number" class="cfg-num" .value="${this.config.zero_export_ramp_rate || 50}"
-                      @change="${(e) => this.config = { ...this.config, zero_export_ramp_rate: e.target.value }}">
-                    <span class="unit-tag">W/s</span>
-                 </div>
-              </div>
-
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Ziel-Bereich (Watt)</div>
-                    <div class="cfg-desc">Bereich am Zähler, in dem NICHT nachgeregelt wird (Min bis Max).</div>
-                 </div>
-                 <div class="input-wrap" style="flex-direction: row; gap: 10px;">
-                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_target_lower || -10}"
-                      @change="${(e) => this.config = { ...this.config, zero_export_target_lower: e.target.value }}">
-                    <span>bis</span>
-                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_target_upper || 20}"
-                      @change="${(e) => this.config = { ...this.config, zero_export_target_upper: e.target.value }}">
-                    <span class="unit-tag">W</span>
-                 </div>
-              </div>
-            </div>
-
-           <!-- BATTERIESCHUTZ -->
-           <div class="config-section glass" style="display: flex; flex-direction: column;">
-              <div class="section-title"><ha-icon icon="mdi:battery-shield"></ha-icon> BATTERIESCHUTZ</div>
-              
-              <div class="cfg-row" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Batterieschutz aktivieren</div>
-                    <div class="cfg-desc">Verhindert die Tiefenentladung des Akkus (Erfordert Batterie SOC Sensor).</div>
-                 </div>
-                 <ha-switch .checked="${this.config.battery_protection_enabled || false}"
-                   @change="${(e) => { this.config = { ...this.config, battery_protection_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
-              </div>
-
-              ${this.config.battery_protection_enabled ? html`
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Abschalt-Limit (SOC %)</div>
-                    <div class="cfg-desc">Bei diesem Wert wird das Limit auf 0W gesetzt.</div>
-                 </div>
-                 <div class="input-wrap">
-                    <input type="number" class="cfg-num" .value="${this.config.battery_min_soc || 10}"
-                      @change="${(e) => this.config = { ...this.config, battery_min_soc: e.target.value }}">
-                    <span class="unit-tag">%</span>
-                 </div>
-              </div>
-
-              <div class="cfg-row">
-                 <div class="cfg-info">
-                    <div class="cfg-label">Einschalt-Limit (SOC %)</div>
-                    <div class="cfg-desc">Erst ab diesem Wert wird wieder freigegeben.</div>
-                 </div>
-                 <div class="input-wrap">
-                    <input type="number" class="cfg-num" .value="${this.config.battery_restart_soc || 15}"
-                      @change="${(e) => this.config = { ...this.config, battery_restart_soc: e.target.value }}">
-                    <span class="unit-tag">%</span>
-                 </div>
-              </div>
-               <div class="cfg-row" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
-                  <div class="cfg-info">
-                     <div class="cfg-label">Nacht-Reserve (SOC %)</div>
-                     <div class="cfg-desc">Erhöht den Batterieschutz ab einer bestimmten Uhrzeit.</div>
-                  </div>
-                  <ha-switch .checked="${this.config.night_reserve_enabled || false}"
-                    @change="${(e) => { this.config = { ...this.config, night_reserve_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
-               </div>
-               ${this.config.night_reserve_enabled ? html`
+          ${this.activeSubTab === 'general' ? html`
+            <div class="config-section glass animate-fade-in" style="grid-column: span 2;">
+               <div class="section-title"><ha-icon icon="mdi:tune-vertical"></ha-icon> STEUERUNG & HARDWARE</div>
+               
                <div class="cfg-row">
                   <div class="cfg-info">
-                     <div class="cfg-label">Reserve ab (Uhrzeit)</div>
-                     <div class="cfg-desc">Ab wann soll die Nacht-Reserve greifen?</div>
+                     <div class="cfg-label">Automatisierung</div>
+                     <div class="cfg-desc">Nulleinspeisung ein- oder ausschalten.</div>
                   </div>
-                  <input type="time" class="cfg-num" style="width: 100px;" .value="${this.config.night_reserve_start_time || '18:00'}"
-                    @change="${(e) => this.config = { ...this.config, night_reserve_start_time: e.target.value }}">
+                  <ha-switch .checked="${this.config.is_enabled || false}"
+                    @change="${(e) => { this.config = { ...this.config, is_enabled: e.target.checked }; this._handleSwitchChange(e.target.checked); }}"></ha-switch>
                </div>
+
                <div class="cfg-row">
                   <div class="cfg-info">
-                     <div class="cfg-label">Nacht-SOC (%)</div>
-                     <div class="cfg-desc">Ziel-SOC für die Nacht-Reserve.</div>
+                     <div class="cfg-label">Betriebsmodus</div>
+                     <div class="cfg-desc">ZEN = Automatisch, Manuell = Fester Wert.</div>
+                  </div>
+                  <select class="cfg-select" .value="${this.config.operation_mode || 'zero_export'}"
+                    @change="${(e) => this.config = { ...this.config, operation_mode: e.target.value }}">
+                     <option value="zero_export">ZEN (Automatik)</option>
+                     <option value="base_load">Grundlast (Plugs)</option>
+                     <option value="manual_limit">Manuell</option>
+                     <option value="disabled">Inaktiv</option>
+                  </select>
+               </div>
+
+               <div class="cfg-row animate-fade-in" style="display: ${this.config.operation_mode === 'manual_limit' ? 'flex' : 'none'}; border-left: 3px solid var(--accent); padding-left: 15px; background: rgba(247, 147, 26, 0.05); margin-top: -10px; margin-bottom: 20px; border-radius: 0 8px 8px 0;">
+                  <div class="cfg-info">
+                     <div class="cfg-label" style="color: var(--accent);">Manuelles Limit</div>
+                     <div class="cfg-desc">Fester Wert für den Wechselrichter.</div>
                   </div>
                   <div class="input-wrap">
-                     <input type="number" class="cfg-num" .value="${this.config.night_reserve_soc || 25}"
-                       @change="${(e) => this.config = { ...this.config, night_reserve_soc: e.target.value }}">
-                     <span class="unit-tag">%</span>
+                     <input type="number" class="cfg-num" style="border-color: var(--accent); flex: 1;" .value="${this.config.manual_limit_value || 50}"
+                       @change="${(e) => { this.config = { ...this.config, manual_limit_value: e.target.value }; this.requestUpdate(); }}">
+                     <select class="cfg-select" style="margin-left: 10px; width: auto; min-width: 60px; padding: 12px 10px;" .value="${this.config.manual_limit_type || 'percent'}"
+                       @change="${(e) => { this.config = { ...this.config, manual_limit_type: e.target.value }; this.requestUpdate(); }}">
+                        <option value="percent">%</option>
+                        <option value="watt">W</option>
+                     </select>
                   </div>
                </div>
-               ` : ''}
+
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Hardware-System</div>
+                     <div class="cfg-desc">Welches Gerät wird gesteuert?</div>
+                  </div>
+                  <select class="cfg-select" .value="${this.config.inverter_type || 'hoymiles'}"
+                    @change="${(e) => this.config = { ...this.config, inverter_type: e.target.value }}">
+                     <option value="hoymiles">Hoymiles (DTU)</option>
+                     <option value="opendtu">OpenDTU / AhoyDTU</option>
+                     <option value="generic">Anderes (EZ1/HA)</option>
+                  </select>
+               </div>
+
+               ${this.config.inverter_type === 'hoymiles' ? html`
+                  <div class="cfg-row">
+                     <div class="cfg-info">
+                        <div class="cfg-label">Ziel-Inverter</div>
+                        <div class="cfg-desc">Seriennummer des Inverters.</div>
+                     </div>
+                     <select class="cfg-select" .value="${this.config.selected_inverter || 'all'}"
+                       @change="${(e) => this.config = { ...this.config, selected_inverter: e.target.value }}">
+                        <option value="all">Alle Geräte</option>
+                        ${this._availableInverters.map(sn => html`<option value="${sn}">${sn}</option>`)}
+                     </select>
+                  </div>
+               ` : html`
+                  <div class="cfg-row column">
+                     <div class="cfg-info">
+                        <div class="cfg-label">External Limit Entity</div>
+                     </div>
+                     <hoymiles-entity-picker .hass="${this.hass}" label="Number Entity" .value="${this.config.external_limit_entity}" domain="number"
+                       @value-changed="${(e) => this.config = { ...this.config, external_limit_entity: e.detail.value }}"></hoymiles-entity-picker>
+                  </div>
+               `}
+            </div>
+          ` : ''}
+
+          ${this.activeSubTab === 'sensors' ? html`
+            <div class="config-section glass animate-fade-in" style="grid-column: span 2;">
+               <div class="section-title"><ha-icon icon="mdi:nas"></ha-icon> SENSOR ZUORDNUNG</div>
+               <div class="picker-grid">
+                  <div class="p-card">
+                    <div class="p-head"><ha-icon icon="mdi:solar-power"></ha-icon> Solar Leistung (W)</div>
+                    <hoymiles-entity-picker .hass="${this.hass}" label="Entität" .value="${this.config.solar_power_sensor}"
+                      @value-changed="${(e) => this.config = { ...this.config, solar_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                    <div class="u-sel">
+                       <select @change="${(e) => this.config = { ...this.config, solar_power_scale: e.target.value }}">
+                          <option value="none" ?selected="${this.config.solar_power_scale === 'none'}">W</option>
+                          <option value="kw_to_w" ?selected="${this.config.solar_power_scale === 'kw_to_w'}">kW -> W</option>
+                       </select>
+                    </div>
+                  </div>
+
+                  <div class="p-card">
+                    <div class="p-head"><ha-icon icon="mdi:transmission-tower"></ha-icon> Stromzähler (W)</div>
+                    <hoymiles-entity-picker .hass="${this.hass}" label="Entität" .value="${this.config.grid_sensor}"
+                      @value-changed="${(e) => this.config = { ...this.config, grid_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                    <div class="u-sel">
+                        <select @change="${(e) => this.config = { ...this.config, grid_power_scale: e.target.value }}">
+                           <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">W</option>
+                           <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">kW -> W</option>
+                        </select>
+                    </div>
+                  </div>
+
+                  <div class="p-card">
+                    <div class="p-head"><ha-icon icon="mdi:battery-high"></ha-icon> Batterie SOC (%)</div>
+                    <hoymiles-entity-picker .hass="${this.hass}" label="Entität" .value="${this.config.battery_soc_sensor}"
+                      @value-changed="${(e) => this.config = { ...this.config, battery_soc_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                  </div>
+
+                  <div class="p-card">
+                    <div class="p-head"><ha-icon icon="mdi:battery-charging"></ha-icon> Batterie Leistung (W)</div>
+                    <hoymiles-entity-picker .hass="${this.hass}" label="Entität" .value="${this.config.battery_power_sensor}"
+                      @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                    <div class="cfg-row" style="margin-top: 10px; border-bottom: none; padding: 0;">
+                       <div class="cfg-label" style="font-size: 0.8em;">Richtung umkehren (Invert)</div>
+                       <ha-switch .checked="${this.config.battery_power_invert || false}"
+                         @change="${(e) => { this.config = { ...this.config, battery_power_invert: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+                    </div>
+                  </div>
+                  
+                  ${this._expertMode ? html`
+                  <div class="p-card animate-fade-in" style="grid-column: span 2;">
+                    <div class="p-head"><ha-icon icon="mdi:calculator"></ha-icon> Phasen-Saldierung (Optional)</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+                       <div>
+                         <label style="font-size: 0.7em; color: var(--text-dim);">Phase L1</label>
+                         <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l1}"
+                           @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l1: e.detail.value }}"></hoymiles-entity-picker>
+                       </div>
+                       <div>
+                         <label style="font-size: 0.7em; color: var(--text-dim);">Phase L2</label>
+                         <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l2}"
+                           @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l2: e.detail.value }}"></hoymiles-entity-picker>
+                       </div>
+                       <div>
+                         <label style="font-size: 0.7em; color: var(--text-dim);">Phase L3</label>
+                         <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l3}"
+                           @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l3: e.detail.value }}"></hoymiles-entity-picker>
+                       </div>
+                    </div>
+                  </div>
+                  ` : ''}
+               </div>
+            </div>
+          ` : ''}
+
+          ${this.activeSubTab === 'algorithm' ? html`
+            <div class="config-section glass animate-fade-in" style="grid-column: span 2;">
+               <div class="section-title"><ha-icon icon="mdi:brain"></ha-icon> REGELUNG (ZEN)</div>
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Ziel-Bezug am Zähler</div>
+                     <div class="cfg-desc">Standard: 10W Netzbezug.</div>
+                  </div>
+                  <div class="input-wrap">
+                     <input type="number" class="cfg-num" .value="${this.config.target_grid_watt || 0}"
+                       @change="${(e) => this.config = { ...this.config, target_grid_watt: e.target.value }}">
+                     <span class="unit-tag">W</span>
+                  </div>
+               </div>
+
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Max. AC Leistung</div>
+                  </div>
+                  <div class="input-wrap">
+                     <input type="number" class="cfg-num" .value="${this.config.max_capacity || 800}"
+                       @change="${(e) => this.config = { ...this.config, max_capacity: e.target.value }}">
+                     <span class="unit-tag">W</span>
+                  </div>
+               </div>
                
-               <div style="flex: 1;"></div>
-            </div>
+               ${this._expertMode ? html`
+                <div class="cfg-row animate-fade-in">
+                   <div class="cfg-info">
+                      <div class="cfg-label">Hysterese</div>
+                      <div class="cfg-desc">Abweichung bevor geregelt wird.</div>
+                   </div>
+                   <div class="input-wrap">
+                      <input type="number" class="cfg-num" .value="${this.config.zero_export_hysteresis || 5}"
+                        @change="${(e) => this.config = { ...this.config, zero_export_hysteresis: e.target.value }}">
+                      <span class="unit-tag">W</span>
+                   </div>
+                </div>
 
-            <!-- WETTER OPTIMIERUNG -->
-            <div class="config-section glass">
-               <div class="section-title"><ha-icon icon="mdi:weather-partly-cloudy"></ha-icon> WETTER-INTELIGENZ</div>
-               <div class="cfg-row">
-                  <div class="cfg-info">
-                     <div class="cfg-label">Wetter-Schutz aktivieren</div>
-                     <div class="cfg-desc">Reduziert Entladung bei schlechtem Wetter-Forecast.</div>
-                  </div>
-                  <ha-switch .checked="${this.config.weather_protection_enabled || false}"
-                    @change="${(e) => { this.config = { ...this.config, weather_protection_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+                <div class="cfg-row animate-fade-in">
+                   <div class="cfg-info">
+                      <div class="cfg-label">Sanftanlauf (Ramp)</div>
+                   </div>
+                   <div class="input-wrap">
+                      <input type="number" class="cfg-num" .value="${this.config.zero_export_ramp_rate || 50}"
+                        @change="${(e) => this.config = { ...this.config, zero_export_ramp_rate: e.target.value }}">
+                      <span class="unit-tag">W/s</span>
+                   </div>
+                </div>
+               ` : ''}
+            </div>
+          ` : ''}
+
+          ${this.activeSubTab === 'safety' ? html`
+            <div class="config-section glass animate-fade-in" style="grid-column: span 2;">
+                <div class="section-title"><ha-icon icon="mdi:battery-shield"></ha-icon> SICHERHEIT</div>
+                <div class="cfg-row">
+                   <div class="cfg-info">
+                      <div class="cfg-label">Batterieschutz</div>
+                      <div class="cfg-desc">Ausschalten bei Min SOC.</div>
+                   </div>
+                   <ha-switch .checked="${this.config.battery_protection_enabled || false}"
+                     @change="${(e) => { this.config = { ...this.config, battery_protection_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+                </div>
+                ${this.config.battery_protection_enabled ? html`
+                <div class="cfg-row animate-fade-in">
+                   <div class="cfg-info">
+                      <div class="cfg-label">Limits (Min / Restart)</div>
+                   </div>
+                   <div class="input-wrap" style="gap: 10px;">
+                      <input type="number" class="cfg-num" style="width: 85px; padding-left: 10px; padding-right: 10px; text-align: center;" .value="${this.config.battery_min_soc || 10}"
+                        @change="${(e) => this.config = { ...this.config, battery_min_soc: e.target.value }}">
+                      <span style="color: var(--text-dim);">/</span>
+                      <input type="number" class="cfg-num" style="width: 85px; padding-left: 10px; padding-right: 10px; text-align: center;" .value="${this.config.battery_restart_soc || 15}"
+                        @change="${(e) => this.config = { ...this.config, battery_restart_soc: e.target.value }}">
+                      <span class="unit-tag" style="position: static; margin-left: 5px;">%</span>
+                   </div>
+                </div>
+                ` : ''}
+
+                <div class="cfg-row" style="margin-top: 20px;">
+                   <div class="cfg-info">
+                      <div class="cfg-label">Wetter-Schutz</div>
+                   </div>
+                   <ha-switch .checked="${this.config.weather_protection_enabled || false}"
+                     @change="${(e) => { this.config = { ...this.config, weather_protection_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+                </div>
+                ${this.config.weather_protection_enabled ? html`
+                <div class="cfg-row animate-fade-in">
+                   <hoymiles-entity-picker .hass="${this.hass}" label="Wetter-Entität" .value="${this.config.weather_sensor}"
+                     @value-changed="${(e) => this.config = { ...this.config, weather_sensor: e.detail.value }}"></hoymiles-entity-picker>
+                </div>
+                ` : ''}
+            </div>
+          ` : ''}
+
+          ${this.activeSubTab === 'devices' ? html`
+            <div class="config-section glass animate-fade-in" style="grid-column: span 2;">
+               <div class="section-title" style="display: flex; justify-content: space-between;">
+                 <span><ha-icon icon="mdi:devices"></ha-icon> ZUSATZGERÄTE</span>
+                 <ha-switch .checked="${this.config.enable_sub_consumers || false}"
+                   @change="${(e) => { this.config = { ...this.config, enable_sub_consumers: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
                </div>
-               ${this.config.weather_protection_enabled ? html`
-               <div class="cfg-row">
-                  <div class="cfg-info">
-                     <div class="cfg-label">Wetter-Entität</div>
-                     <div class="cfg-desc">Wähle deine Wetter-Vorhersage (z.B. weather.home).</div>
-                  </div>
-                  <hoymiles-entity-picker .hass="${this.hass}" label="Wetter wählen" .value="${this.config.weather_sensor}"
-                    @value-changed="${(e) => this.config = { ...this.config, weather_sensor: e.detail.value }}"></hoymiles-entity-picker>
+               
+               ${this.config.enable_sub_consumers ? html`
+               <div class="sub-config-grid animate-fade-in" style="margin-top: 20px;">
+                  ${[1, 2, 3, 4].map(i => html`
+                    <div class="p-card sub-card">
+                       <input type="text" class="cfg-text" placeholder="Name" style="margin-bottom: 10px;"
+                         .value="${this.config['sub_consumer_' + i + '_name'] || ''}"
+                         @input="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_name']: e.target.value }}">
+                       <hoymiles-entity-picker .hass="${this.hass}" label="Power Sensor" .value="${this.config['sub_consumer_' + i + '_sensor']}"
+                         @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_sensor']: e.detail.value }}"></hoymiles-entity-picker>
+                    </div>
+                  `)}
                </div>
                ` : ''}
             </div>
-
-            <!-- INFO PANEL -->
-            <div class="config-section glass" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(0, 210, 255, 0.03); border-color: rgba(0, 210, 255, 0.2); box-shadow: 0 0 30px rgba(0, 210, 255, 0.05) inset; padding: 40px;">
-               <div style="background: rgba(0, 210, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; border: 1px solid rgba(0, 210, 255, 0.3);">
-                  <ha-icon icon="mdi:brain" style="font-size: 3em; color: var(--neon-blue); filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.5));"></ha-icon>
-               </div>
-               <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 1.3em; letter-spacing: 2px;">DIE ZEN AUTOMATIK</h3>
-               <p style="color: var(--text-dim); line-height: 1.7; margin: 0; font-size: 0.95em;">
-                 Der <strong style="color: #fff;">Z</strong>ero <strong style="color: #fff;">E</strong>xport <strong style="color: #fff;">N</strong>etwork Algorithmus überwacht sekündlich deinen Stromzähler. Er kalkuliert den Echtzeit-Verbrauch und dynamisiert das Limit deiner Wechselrichter – das Netz bleibt sicher, dein Heim ertragsstark!
-               </p>
-            </div>
-         </div>
-
-         <!-- SENSORIK Sektion -->
-        <div class="config-section glass sensor-section">
-           <div class="section-title"><ha-icon icon="mdi:nas"></ha-icon> SENSOR ZUORDNUNG</div>
-           <p class="section-lead">Wähle hier deine Home Assistant Sensoren aus. Die Skalierung erlaubt die Umrechnung von kW zu W.</p>
-           
-           <div class="picker-grid">
-              <div class="p-card">
-                <div class="p-head"><ha-icon icon="mdi:solar-power"></ha-icon> Solar Leistung (W)</div>
-                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.solar_power_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, solar_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="u-sel">
-                   <select @change="${(e) => this.config = { ...this.config, solar_power_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.solar_power_scale === 'none'}">Daten sind in Watt</option>
-                      <option value="kw_to_w" ?selected="${this.config.solar_power_scale === 'kw_to_w'}">Eingang ist kW -> zu W</option>
-                   </select>
-                </div>
-              </div>
-
-              <div class="p-card ${this.config.operation_mode === 'base_load' ? 'disabled' : ''}">
-                <div class="p-head"><ha-icon icon="mdi:transmission-tower"></ha-icon> Stromzähler (W)
-                   ${this.config.operation_mode === 'base_load' ? html`<span style="margin-left: auto; font-size: 0.7em; color: var(--neon-orange);">(Wird bei Grundlast ignoriert)</span>` : ''}
-                </div>
-                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.grid_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, grid_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                          <div class="u-sel">
-                    <select @change="${(e) => this.config = { ...this.config, grid_power_scale: e.target.value }}">
-                       <option value="none" ?selected="${this.config.grid_power_scale === 'none'}">Daten sind in Watt</option>
-                       <option value="kw_to_w" ?selected="${this.config.grid_power_scale === 'kw_to_w'}">Eingang ist kW -> zu W</option>
-                    </select>
-                 </div>
-                 <div class="u-sel" style="margin-top: 10px;">
-                    <label style="display: block; font-size: 0.7em; color: var(--text-dim); margin-bottom: 5px; font-weight: bold;">ZÄHLER-INTERPRETATION:</label>
-                    <select @change="${(e) => this.config = { ...this.config, grid_sensor_type: e.target.value }}">
-                       <option value="net" ?selected="${this.config.grid_sensor_type === 'net'}">Netz-Zähler (Import +, Export -)</option>
-                       <option value="consumption" ?selected="${this.config.grid_sensor_type === 'consumption'}">Haus-Verbrauch (Immer +)</option>
-                    </select>
-                 </div>
-              </div>
-
-              <div class="p-card">
-                <div class="p-head"><ha-icon icon="mdi:battery-high"></ha-icon> Batterie SOC (%)</div>
-                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.battery_soc_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, battery_soc_sensor: e.detail.value }}"></hoymiles-entity-picker>
-              </div>
-
-              <div class="p-card">
-                <div class="p-head"><ha-icon icon="mdi:battery-charging"></ha-icon> Batterie Leistung (W)</div>
-                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.battery_power_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
-              </div>
-
-              <!-- PHASEN-SALDIERUNG (Advanced) -->
-              <div class="p-card" style="grid-column: span 2;">
-                <div class="p-head"><ha-icon icon="mdi:calculator"></ha-icon> Phasen-Saldierung (Optional)</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
-                   <div>
-                     <label style="font-size: 0.7em; color: var(--text-dim);">Phase L1</label>
-                     <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l1}"
-                       @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l1: e.detail.value }}"></hoymiles-entity-picker>
-                   </div>
-                   <div>
-                     <label style="font-size: 0.7em; color: var(--text-dim);">Phase L2</label>
-                     <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l2}"
-                       @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l2: e.detail.value }}"></hoymiles-entity-picker>
-                   </div>
-                   <div>
-                     <label style="font-size: 0.7em; color: var(--text-dim);">Phase L3</label>
-                     <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l3}"
-                       @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l3: e.detail.value }}"></hoymiles-entity-picker>
-                   </div>
-                </div>
-                <p style="font-size: 0.7em; color: var(--text-dim); margin-top: 10px;">Nur ausfüllen, wenn keine Summen-Entität oben gewählt wurde.</p>
-              </div>
-
-              <div class="p-card">
-                <div class="p-head"><ha-icon icon="mdi:chart-line"></ha-icon> Solar Ertrag Heute</div>
-                <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.solar_energy_yield_sensor}"
-                  @value-changed="${(e) => this.config = { ...this.config, solar_energy_yield_sensor: e.detail.value }}"></hoymiles-entity-picker>
-                <div class="u-sel">
-                   <select @change="${(e) => this.config = { ...this.config, solar_yield_scale: e.target.value }}">
-                      <option value="none" ?selected="${this.config.solar_yield_scale === 'none'}">Daten sind in kWh</option>
-                      <option value="w_to_kw" ?selected="${this.config.solar_yield_scale === 'w_to_kw'}">Eingang ist Wh -> zu kWh</option>
-                   </select>
-                </div>
-              </div>
-        </div>
-
-           </div>
-        </div>
-
-        <!-- GRUNDLAST SEKTION (NUR SICHTBAR IM BASE_LOAD MODUS) -->
-        ${this.config.operation_mode === 'base_load' ? html`
-        <div class="config-section glass sensor-section animate-fade-in" style="margin-top: 20px;">
-           <div class="section-title"><ha-icon icon="mdi:power-plug"></ha-icon> GRUNDLAST SENSOREN</div>
-           <p class="section-lead">Hier konfigurierst du die statische Grundlast und die spezifischen Steckdosen (Plugs), die dein variables "Grundlast-Profil" bilden.</p>
-           
-           <div class="cfg-row" style="margin-bottom: 25px;">
-              <div class="cfg-info">
-                 <div class="cfg-label">Statische Grundlast</div>
-                 <div class="cfg-desc">Fester Wert in Watt (z.B. 40W für Router & Kühlschrank).</div>
-              </div>
-              <div class="input-wrap">
-                 <input type="number" class="cfg-num" .value="${this.config.static_base_load || 0}"
-                   @change="${(e) => this.config = { ...this.config, static_base_load: e.target.value }}">
-                 <span class="unit-tag">W</span>
-              </div>
-           </div>
-
-           <div class="sub-config-grid">
-              ${[1, 2, 3, 4, 5, 6].map(i => html`
-                <div class="p-card sub-card">
-                   <div class="p-head"><ha-icon icon="mdi:power-socket-eu"></ha-icon> Strom-Plug ${i}</div>
-                   <hoymiles-entity-picker .hass="${this.hass}" label="Leistungssensor (W)" .value="${this.config['base_plug_' + i]}"
-                     @value-changed="${(e) => this.config = { ...this.config, ['base_plug_' + i]: e.detail.value }}"></hoymiles-entity-picker>
-                </div>
-              `)}
-           </div>
-        </div>
-        ` : ''}
-
-        <!-- ZUSATZVERBRAUCHER SEKTION -->
-        <div class="config-section glass sensor-section" style="margin-top: 20px;">
-           <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: ${this.config.enable_sub_consumers ? '15px' : '0'}; border-bottom: ${this.config.enable_sub_consumers ? '1px solid rgba(255,255,255,0.05)' : 'none'}; padding-bottom: ${this.config.enable_sub_consumers ? '15px' : '0'};">
-             <span style="display: flex; align-items: center; gap: 15px;"><ha-icon icon="mdi:devices"></ha-icon> ZUSATZVERBRAUCHER (DASHBOARD)</span>
-             <ha-switch .checked="${this.config.enable_sub_consumers || false}" @change="${(e) => { this.config = { ...this.config, enable_sub_consumers: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
-           </div>
-           
-           ${this.config.enable_sub_consumers ? html`
-           <p class="section-lead animate-fade-in">Hier kannst du spezifische Geräte wie Wärmepumpen oder Klimaanlagen konfigurieren, die auf dem Dashboard erscheinen sollen.</p>
-           
-           <div class="sub-config-grid animate-fade-in">
-              ${[1, 2, 3, 4].map(i => html`
-                <div class="p-card sub-card">
-                   <div class="p-head" style="margin-bottom: 25px; display: flex; justify-content: space-between;">
-                      <span style="display: flex; align-items: center; gap: 10px;"><ha-icon icon="mdi:devices"></ha-icon> Gerät ${i} ${this.config['sub_consumer_' + i + '_name'] ? `(${this.config['sub_consumer_' + i + '_name']})` : ''}</span>
-                   </div>
-                   
-                   <div class="cfg-compact-row animate-fade-in">
-                      <input type="text" class="cfg-text" placeholder="Bezeichnung (z.B. Wärmepumpe)" 
-                        .value="${this.config['sub_consumer_' + i + '_name'] || ''}"
-                        @input="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_name']: e.target.value }}">
-                      
-                      <select class="cfg-select-small" .value="${this.config['sub_consumer_' + i + '_icon'] || 'mdi:power-plug'}"
-                        @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_icon']: e.target.value }}">
-                         <option value="mdi:power-plug">Stecker</option>
-                         <option value="mdi:heat-wave">Wärmepumpe</option>
-                         <option value="mdi:bitcoin">Kryptominer</option>
-                         <option value="mdi:air-conditioner">Klimagerät</option>
-                         <option value="mdi:water-pump">Brauchwasserpumpe</option>
-                         <option value="mdi:car-electric">Elektroauto</option>
-                         <option value="mdi:washing-machine">Waschmaschine</option>
-                         <option value="mdi:dishwasher">Spülmaschine</option>
-                         <option value="mdi:water-boiler">Boiler</option>
-                         <option value="mdi:fan">Lüfter</option>
-                         <option value="mdi:lightning-bolt">Allgemein</option>
-                      </select>
-                   </div>
-
-                   <hoymiles-entity-picker .hass="${this.hass}" label="Leistungssensor" .value="${this.config['sub_consumer_' + i + '_sensor']}"
-                     @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_sensor']: e.detail.value }}"></hoymiles-entity-picker>
-
-                   <div style="margin-bottom: 20px;">
-                      <label style="display: block; color: var(--text-dim); font-weight: bold; font-size: 0.85em; margin-bottom: 8px; text-transform: uppercase;">Einheit des Sensors:</label>
-                      <select class="cfg-select-small" .value="${this.config['sub_consumer_' + i + '_scale'] || 'none'}"
-                        @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_scale']: e.target.value }}">
-                         <option value="none">Daten sind in Watt (W)</option>
-                         <option value="kw_to_w">Daten sind in Kilowatt (kW)</option>
-                      </select>
-                   </div>
-
-                   <hoymiles-entity-picker .hass="${this.hass}" label="Schalter (Optional)" .value="${this.config['sub_consumer_' + i + '_toggle']}" domain="switch,light"
-                     @value-changed="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_toggle']: e.detail.value }}"></hoymiles-entity-picker>
-                   
-                   <div class="cfg-row-mini" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
-                      <label style="font-size: 0.9em; font-weight: bold; color: var(--accent);">In Grundlast einbeziehen?</label>
-                      <ha-checkbox .checked="${this.config['sub_consumer_' + i + '_use_as_load'] || false}"
-                        @change="${(e) => this.config = { ...this.config, ['sub_consumer_' + i + '_use_as_load']: e.target.checked }}"></ha-checkbox>
-                   </div>
-                </div>
-              `)}
-           </div>
-           ` : ''}
+          ` : ''}
         </div>
 
         <button class="mega-save-btn" @click="${this._saveConfig}">
@@ -1405,6 +1427,12 @@ class HoymilesCYDPanel extends LitElement {
         overflow-x: hidden;
       }
 
+      .sub-nav { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; overflow-x: auto; scrollbar-width: none; }
+      .sub-nav::-webkit-scrollbar { display: none; }
+      .sub-item { padding: 10px 22px; cursor: pointer; color: var(--text-dim); font-size: 0.8em; font-weight: 800; letter-spacing: 1.5px; border-radius: 25px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; border: 1px solid transparent; text-transform: uppercase; }
+      .sub-item:hover { color: #fff; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
+      .sub-item.active { color: #fff; background: var(--kairo-cyan); border-color: var(--kairo-cyan); box-shadow: 0 0 20px rgba(0, 242, 255, 0.3); }
+
       .neon-orange { color: var(--neon-orange); filter: drop-shadow(0 0 10px var(--neon-orange)); }
       .neon-blue { color: var(--neon-blue); filter: drop-shadow(0 0 10px var(--neon-blue)); }
       .neon-green { color: var(--neon-green); filter: drop-shadow(0 0 10px var(--neon-green)); }
@@ -1451,18 +1479,52 @@ class HoymilesCYDPanel extends LitElement {
         z-index: 20; transition: 0.4s;
       }
       .inverter-hub:hover { transform: translate(-50%, -50%) scale(1.05); }
-      .hub-label { font-size: 0.6em; color: var(--text-dim); font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; }
-      .hub-value { font-size: 1.8em; font-weight: 900; color: #fff; line-height: 1; }
-      .hub-unit { font-size: 0.4em; }
-      .hub-status { font-size: 0.55em; margin-top: 8px; padding: 2px 8px; border-radius: 6px; background: rgba(57, 255, 20, 0.1); color: var(--neon-green); font-weight: 800; }
+      .hub-label { font-size: 0.7em; color: var(--text-dim); font-weight: 800; letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase; }
+      .hub-value { font-size: 2.2em; font-weight: 900; color: #fff; line-height: 1; font-family: 'JetBrains Mono', monospace; }
+      .hub-unit { font-size: 0.5em; vertical-align: super; margin-left: 2px; color: var(--kairo-cyan); }
+      .hub-status { font-size: 0.6em; margin-top: 12px; padding: 4px 12px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: #fff; font-weight: 800; letter-spacing: 1px; }
 
-      .particle { animation: particle-move 3s linear infinite; }
-      @keyframes particle-move {
-        0% { offset-distance: 0%; opacity: 0; }
-        10% { opacity: 1; }
-        90% { opacity: 1; }
-        100% { offset-distance: 100%; opacity: 0; }
+      .leg-item { display: flex; align-items: center; gap: 8px; font-size: 0.75em; font-weight: 700; color: #fff; letter-spacing: 1px; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+
+      .pth { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 2; }
+      .engine-svg { width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+      @keyframes flow {
+        from { offset-distance: 0%; }
+        to { offset-distance: 100%; }
       }
+      .flow-dot { 
+        offset-rotate: auto;
+        will-change: offset-distance;
+      }
+      .particle-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+      .flow-particle {
+        position: absolute; width: 6px; height: 6px; border-radius: 2px;
+        border: 1px solid rgba(255,255,255,0.8);
+        will-change: offset-distance;
+      }
+
+      .inverter-hub.import {
+        border-color: var(--neon-pink);
+        box-shadow: 0 0 30px rgba(255, 0, 127, 0.2), inset 0 0 20px rgba(0,0,0,0.8);
+      }
+      .inverter-hub.export {
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 30px rgba(0, 242, 255, 0.2), inset 0 0 20px rgba(0,0,0,0.8);
+      }
+      .inverter-hub.balanced {
+        border-color: var(--neon-green);
+        box-shadow: 0 0 30px rgba(57, 255, 20, 0.2), inset 0 0 20px rgba(0,0,0,0.8);
+        animation: hub-pulse-green 2s infinite ease-in-out;
+      }
+
+      @keyframes hub-pulse-green {
+        0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px rgba(57, 255, 20, 0.2); }
+        50% { transform: translate(-50%, -50%) scale(1.03); box-shadow: 0 0 40px rgba(57, 255, 20, 0.4); }
+        100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px rgba(57, 255, 20, 0.2); }
+      }
+
+
 
       .batt-bar-wrap { width: 12px; height: 40px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-top: 5px; border: 1px solid rgba(255,255,255,0.1); }
       .batt-bar-fill { width: 100%; background: var(--neon-green); transition: height 1s ease; box-shadow: 0 0 10px var(--neon-green); }
@@ -1564,6 +1626,26 @@ class HoymilesCYDPanel extends LitElement {
       }
       .tab:hover { background: rgba(255,255,255,0.05); color: #fff; transform: translateY(-2px); }
       .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 10px 30px var(--accent-glow); }
+
+      /* --- MAIN NAVIGATION --- */
+      .main-nav { 
+        display: flex; gap: 8px; padding: 6px; margin-bottom: 35px; 
+        background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); 
+        border-radius: 20px; width: fit-content;
+      }
+      .nav-item { 
+        padding: 10px 24px; border-radius: 14px; cursor: pointer; 
+        font-size: 0.8em; font-weight: 800; color: var(--text-dim); 
+        letter-spacing: 1.5px; transition: 0.4s; display: flex; align-items: center; gap: 10px;
+        text-transform: uppercase;
+      }
+      .nav-item ha-icon { --mdc-icon-size: 20px; }
+      .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+      .nav-item.active { 
+        background: rgba(0, 242, 255, 0.1); color: var(--kairo-cyan); 
+        box-shadow: inset 0 0 15px rgba(0, 242, 255, 0.1);
+        border: 1px solid rgba(0, 242, 255, 0.2);
+      }
 
       /* --- LAYOUT --- */
       .dashboard-layout { display: grid; grid-template-columns: 1fr 360px; gap: 30px; }
@@ -1689,6 +1771,7 @@ class HoymilesCYDPanel extends LitElement {
       .setup-step { font-size: 1em; color: var(--text-dim); margin-top: 5px; }
 
       .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; margin-bottom: 30px; }
+      .config-section { overflow: visible !important; position: relative; z-index: 5; }
       @media (max-width: 900px) {
         .config-grid { grid-template-columns: 1fr; }
       }

@@ -257,6 +257,8 @@ class HoymilesCYDSyncView(HomeAssistantView):
             "grid": {"p": grid_p, "imp": grid_import, "exp": grid_export, "u_p": config.get("grid_power_unit", "W"), "u_e": config.get("grid_energy_unit", "kWh")},
             "bat": {"p": bat_p, "soc": bat_soc, "u_p": config.get("battery_power_unit", "W")},
             "status": ze_status,
+            "log": getattr(manager, "_decision_log", []),
+            "saved_wh": getattr(manager, "_total_saved_wh", 0.0),
             "version": version,
             "update": should_update,
             "ts": now

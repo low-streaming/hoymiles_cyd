@@ -51,6 +51,17 @@ class ZeroExportManager:
         self._last_ramp_limit = -1.0
         self._last_interval = 10.0
         self._last_limit_watts = 0.0
+        self._decision_log = [] # List of strings: timestamp | action | reason
+        self._total_saved_wh = 0.0 # Energy saved in Wh
+        self._last_energy_calc_ts = None
+
+    def _log_decision(self, action, reason):
+        """Add an entry to the decision log."""
+        from datetime import datetime
+        ts = datetime.now().strftime("%H:%M:%S")
+        self._decision_log.insert(0, f"{ts} | {action} | {reason}")
+        if len(self._decision_log) > 20:
+            self._decision_log.pop()
 
     def add_state_change_callback(self, callback_func):
         """Add callback for state changes."""
@@ -512,6 +523,12 @@ class ZeroExportManager:
                 except ValueError:
                     pass
         
+        # Energy calculation
+        if self._last_energy_calc_ts and self._last_limit_watts > 0:
+            dt = now - self._last_energy_calc_ts
+            self._total_saved_wh += (self._last_limit_watts * dt) / 3600.0
+        self._last_energy_calc_ts = now
+
         if self._is_updating or (now - last_exec < interval and not self._battery_empty_mode):
             return
             
@@ -537,20 +554,23 @@ class ZeroExportManager:
 
             # Check if we actually need to update (Range check)
             if is_stable and self._last_limit is not None:
+                self._log_decision("SKIP", f"Grid {int(grid_power)}W in Range [{target_lower}, {target_upper}]")
                 _LOGGER.debug(f"Zero Export: Grid power {grid_power}W within target range [{target_lower}, {target_upper}]. Skipping.")
                 return
 
             # --- WETTER SCHUTZ ---
+            weather_active = False
             weather_enabled = self._config.get("weather_protection_enabled")
             weather_sensor = self._config.get("weather_sensor")
             if weather_enabled and weather_sensor:
                 w_state = self.hass.states.get(weather_sensor)
                 if w_state and w_state.state in ("rainy", "pouring", "cloudy", "thunderstorm", "snowy"):
-                    # Reduce desired production by 30% to keep battery reserve
-                    _LOGGER.info(f"Weather Protection: Forecast is {w_state.state}. Reducing discharge target to preserve battery.")
+                    _LOGGER.info(f"Weather Protection: Forecast is {w_state.state}. Reducing discharge target.")
                     desired_production *= 0.7
+                    weather_active = True
 
             # --- RAMP LIMITING ---
+            ramped = False
             ramp_rate = float(self._config.get("zero_export_ramp_rate", 50.0))
             if ramp_rate > 0 and self._last_limit_watts > 0:
                 dt = now - last_exec
@@ -558,7 +578,7 @@ class ZeroExportManager:
                 diff = desired_production - self._last_limit_watts
                 if abs(diff) > max_change:
                     desired_production = self._last_limit_watts + (max_change if diff > 0 else -max_change)
-                    _LOGGER.debug(f"Zero Export: Ramp Limit. Capped to {desired_production}W")
+                    ramped = True
 
             desired_production = max(0.0, desired_production)
             
@@ -581,6 +601,14 @@ class ZeroExportManager:
             jitter_threshold = self._hysteresis if limit_unit == "watt" else max(0.2, (self._hysteresis / self._max_capacity) * 100)
             
             if self._last_limit is None or abs(float(self._last_limit) - current_target) >= jitter_threshold:
+                # Log the reason
+                reason = "Zähler-Änderung"
+                if self._battery_empty_mode: reason = "BAT-SCHUTZ"
+                elif weather_active: reason = "WETTER"
+                elif ramped: reason = "RAMP"
+                
+                self._log_decision(f"SET {final_watts}W", f"{reason} ({int(grid_power)}W am Netz)")
+
                 if inv_type == "hoymiles" and dtu:
                     target_inverter = self._config.get("selected_inverter", "all")
                     _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {final_percent}% ({final_watts}W, Target: {target_inverter}, Int: {self._last_interval}s)")
