@@ -148,7 +148,8 @@ class HoymilesCYDPanel extends LitElement {
       _currentVersion: { type: String },
       _connectedDisplays: { type: Object },
       _isUpdating: { type: Boolean },
-      _updateStatus: { type: String }
+      _updateStatus: { type: String },
+      _sunPos: { type: Number }
     };
   }
 
@@ -160,6 +161,7 @@ class HoymilesCYDPanel extends LitElement {
     this._connectedDisplays = {};
     this._isUpdating = false;
     this._updateStatus = '';
+    this._sunPos = -1; // -1 = night, 0-1 = day progress
     this.config = {
       grid_sensor: '',
       grid_energy_import_sensor: '',
@@ -236,6 +238,28 @@ class HoymilesCYDPanel extends LitElement {
         this._updateStatus = event.data.status === 'success' ? 'Update erfolgreich! Bitte HA neu starten.' : 'Fehler: ' + event.data.message;
         this.requestUpdate();
       }, 'hoymiles_cyd_update_completed');
+    }
+    this._updateSunPos();
+  }
+
+  _updateSunPos() {
+    const sun = this.hass.states['sun.sun'];
+    if (!sun) return;
+    
+    const now = new Date();
+    const sunrise = new Date(sun.attributes.next_rising);
+    const sunset = new Date(sun.attributes.next_setting);
+    
+    // If next_rising is in the future and next_setting is in the future, 
+    // we need to know the PREVIOUS rising/setting to calculate current progress.
+    // HA sun entity is a bit tricky, but elevation is a good proxy.
+    const elevation = sun.attributes.elevation || 0;
+    if (elevation <= 0) {
+      this._sunPos = -1;
+    } else {
+      // Approximate progress based on elevation (0 at sunrise, max at noon, 0 at sunset)
+      // This is simplified but effective for a visual arc.
+      this._sunPos = Math.min(1, Math.max(0, elevation / 60)); // Assumes 60 deg max elevation
     }
   }
 
@@ -446,18 +470,14 @@ class HoymilesCYDPanel extends LitElement {
         }
       }
       house_consumption = bl_power;
-      grid_p = house_consumption - solar_p; // Simulate grid exchange based on base load calculation
+      grid_p = house_consumption - solar_p;
     } else {
       const raw_grid_p = getScaled(this.config.grid_sensor, this.config.grid_power_scale);
       if (this.config.grid_sensor_type === 'consumption') {
         house_consumption = raw_grid_p;
-        // Grid = House + Battery(Charging) - Battery(Discharge) - Solar
         grid_p = Math.round(house_consumption + (batt_p || 0) - solar_p, 0);
       } else {
         grid_p = raw_grid_p;
-        // House = Solar + Grid - Battery(Charging) + Battery(Discharge)
-        // Note: if batt_p is positive (charging), it subtracts from the apparent load to get appliances
-        // But usually, users want "House" to include everything. Let's make it consistent.
         house_consumption = Math.max(0, solar_p + grid_p - (batt_p || 0));
       }
     }
@@ -466,14 +486,10 @@ class HoymilesCYDPanel extends LitElement {
     const yield_today = getScaled(this.config.solar_energy_yield_sensor || 'sensor.hoymiles_cyd_today_yield', this.config.solar_yield_scale);
     const import_today = getScaled(this.config.grid_energy_import_sensor, this.config.grid_import_scale);
     const export_today = getScaled(this.config.grid_energy_export_sensor, this.config.grid_export_scale);
-    const battery_soc = this.hass.states[this.config.battery_soc_sensor]?.state || null;
+    const battery_soc = parseFloat(this.hass.states[this.config.battery_soc_sensor]?.state) || 0;
 
     const inverter_temp = (this.hass.states['sensor.hoymiles_cyd_wechselrichtertemperatur'] || this.hass.states['sensor.hoymiles_cyd_temperature'])?.state || '--';
-
-    const zero_export_status = (this.hass.states['sensor.zero_export_controller_nulleinspeisung_status'] || this.hass.states['sensor.zero_export_controller_zero_export_status'])?.state || '--';
     const control_limit = (this.hass.states['sensor.zero_export_controller_nulleinspeisung_leistungslimit'] || this.hass.states['sensor.zero_export_controller_zero_export_limit'])?.state || '0';
-
-    const gauge_deg = (parseFloat(control_limit) / 100) * 180;
 
     const formatPower = (w) => {
       if (Math.abs(w) >= 1000) return (w / 1000).toFixed(2) + ' kW';
@@ -483,82 +499,87 @@ class HoymilesCYDPanel extends LitElement {
     return html`
       <div class="dashboard-layout animate-fade-in">
         <div class="main-card glass">
-          <div class="card-caption">ENERGIEÜBERSICHT (ZERO EXPORT)</div>
           
-          <div class="visualizer">
-            <div class="labels-top">
-              <div class="box">
-                <span class="lab">Solar Produktion</span>
-                <span class="val neon-orange">${formatPower(solar_p)}</span>
-              </div>
-              <div class="box right">
-                <span class="lab">${this.config.operation_mode === 'base_load' ? 'Grundlast' : 'Haus Verbrauch'}</span>
-                <span class="val neon-blue">${formatPower(house_consumption)}</span>
-              </div>
+          <!-- Summary Badges -->
+          <div class="summary-grid">
+            <div class="sum-card">
+              <span class="sum-label">Solar Heute</span>
+              <span class="sum-value">${yield_today.toFixed(2)}<span class="sum-unit">kWh</span></span>
             </div>
+            <div class="sum-card">
+              <span class="sum-label">Netz Bezug</span>
+              <span class="sum-value">${import_today.toFixed(2)}<span class="sum-unit">kWh</span></span>
+            </div>
+            <div class="sum-card">
+              <span class="sum-label">Netz Einspeisung</span>
+              <span class="sum-value">${export_today.toFixed(2)}<span class="sum-unit">kWh</span></span>
+            </div>
+            <div class="sum-card">
+              <span class="sum-label">Haus Gesamt</span>
+              <span class="sum-value">${(import_today + yield_today - export_today).toFixed(2)}<span class="sum-unit">kWh</span></span>
+            </div>
+          </div>
+
+          <div class="visualizer">
+            <!-- Sun Arc -->
+            ${this._renderSunArc()}
 
             <div class="engine">
               <svg class="engine-svg" viewBox="0 0 600 420">
                 <defs>
-                  <linearGradient id="graphGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:var(--accent);stop-opacity:0.3" />
-                    <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0" />
-                  </linearGradient>
-                  
-                  <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
+                   <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                   </filter>
                 </defs>
+
                 <!-- Static Paths -->
-                <path d="M 120 100 Q 300 100 300 210" class="pth" />
-                <path d="M 480 100 Q 300 100 300 210" class="pth" />
-                <path d="M 120 320 Q 300 320 300 210" class="pth" />
-                <path d="M 480 320 Q 300 320 300 210" class="pth" />
+                <path id="p_solar_inv" d="M 120 100 Q 300 100 300 210" class="pth" />
+                <path id="p_inv_house" d="M 300 210 Q 300 100 480 100" class="pth" />
+                <path id="p_grid_inv" d="M 120 320 Q 300 320 300 210" class="pth" />
+                <path id="p_inv_batt" d="M 300 210 Q 300 320 480 320" class="pth" />
                 
-                <!-- Active Flows -->
-                ${solar_p > 20 ? html`
-                  <path d="M 120 100 Q 300 100 300 210" class="pth-active neon-orange-stroke" style="animation-duration: ${Math.max(0.3, 2 - solar_p / 1000)}s;" />
-                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-orange-glow">
-                    <animateMotion dur="${Math.max(0.5, 3 - solar_p / 1000)}s" repeatCount="indefinite" path="M 120 100 Q 300 100 300 210" />
-                  </circle>
-                ` : ''}
+                <!-- Particle Flows -->
+                ${this._renderFlowParticles('M 120 100 Q 300 100 300 210', solar_p, 'neon-orange-glow')}
+                ${this._renderFlowParticles('M 300 210 Q 300 100 480 100', house_consumption, 'neon-blue-glow')}
                 
-                ${house_consumption > 20 ? html`
-                  <path d="M 300 210 Q 300 100 480 100" class="pth-active neon-blue-stroke" style="animation-duration: ${Math.max(0.3, 2 - house_consumption / 1000)}s;" />
-                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-blue-glow">
-                    <animateMotion dur="${Math.max(0.5, 3 - house_consumption / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 100 480 100" />
-                  </circle>
-                ` : ''}
-
-                ${grid_p > 20 ? html`
-                  <path d="M 120 320 Q 300 320 300 210" class="pth-active neon-pink-stroke" style="animation-duration: ${Math.max(0.3, 2 - grid_p / 1000)}s;" />
-                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-pink-glow">
-                    <animateMotion dur="${Math.max(0.5, 4 - grid_p / 1000)}s" repeatCount="indefinite" path="M 120 320 Q 300 320 300 210" />
-                  </circle>
-                ` : html`${grid_p < -20 ? html`
-                  <path d="M 300 210 Q 300 320 120 320" class="pth-active neon-cyan-stroke" style="animation-duration: ${Math.max(0.3, 2 - Math.abs(grid_p) / 1000)}s;" />
-                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-cyan-glow">
-                    <animateMotion dur="${Math.max(0.5, 4 - Math.abs(grid_p) / 1000)}s" repeatCount="indefinite" path="M 300 210 Q 300 320 120 320" />
-                  </circle>
-                ` : ''}`}
-
-                ${Math.abs(batt_p) > 20 ? html`
-                  <path d="${batt_p > 0 ? 'M 480 320 Q 300 320 300 210' : 'M 300 210 Q 300 320 480 320'}" class="pth-active neon-green-stroke" style="animation-duration: ${Math.max(0.3, 2 - Math.abs(batt_p) / 1000)}s;" />
-                  <circle r="6" fill="#fff" filter="url(#neonGlow)" class="neon-green-glow">
-                    <animateMotion dur="${Math.max(0.5, 4 - Math.abs(batt_p) / 1000)}s" repeatCount="indefinite" 
-                      path="${batt_p > 0 ? 'M 480 320 Q 300 320 300 210' : 'M 300 210 Q 300 320 480 320'}" />
-                  </circle>
-                ` : ''}
+                ${grid_p > 20 ? this._renderFlowParticles('M 120 320 Q 300 320 300 210', grid_p, 'neon-pink-glow') : ''}
+                ${grid_p < -20 ? this._renderFlowParticles('M 300 210 Q 300 320 120 320', Math.abs(grid_p), 'neon-cyan-glow') : ''}
+                
+                ${batt_p > 20 ? this._renderFlowParticles('M 300 210 Q 300 320 480 320', batt_p, 'neon-green-glow') : ''}
+                ${batt_p < -20 ? this._renderFlowParticles('M 480 320 Q 300 320 300 210', Math.abs(batt_p), 'neon-green-glow') : ''}
               </svg>
 
-              <div class="node n-solar neon-border-orange" style="top: 23.8%; left: 20%;"><ha-icon icon="mdi:solar-panel-large"></ha-icon></div>
-              <div class="node n-house neon-border-blue" style="top: 23.8%; left: 80%;"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
-              <div class="node n-grid neon-border-pink" style="top: 76.2%; left: 20%;"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
+              <!-- Center Hub -->
+              <div class="inverter-hub">
+                <span class="hub-label">WR-LIMIT</span>
+                <span class="hub-value">${control_limit}<span class="hub-unit">%</span></span>
+                <span class="hub-status">${solar_p > 5 ? 'ERZEUGUNG' : 'STANDBY'}</span>
+              </div>
+
+              <!-- Nodes -->
+              <div class="node n-solar neon-border-orange" style="top: 23.8%; left: 20%;">
+                <ha-icon icon="mdi:solar-power-variant"></ha-icon>
+                <div class="power-tag neon-bg-orange" style="background: var(--neon-orange); bottom: -25px;">${formatPower(solar_p)}</div>
+              </div>
+              
+              <div class="node n-house neon-border-blue" style="top: 23.8%; left: 80%;">
+                <ha-icon icon="mdi:home-lightning-bolt-outline"></ha-icon>
+                <div class="power-tag neon-bg-blue" style="background: var(--neon-blue); bottom: -25px;">${formatPower(house_consumption)}</div>
+              </div>
+              
+              <div class="node n-grid neon-border-pink" style="top: 76.2%; left: 20%;">
+                <ha-icon icon="mdi:transmission-tower-export"></ha-icon>
+                <div class="power-tag" style="background: ${grid_p > 0 ? 'var(--neon-pink)' : 'var(--neon-cyan)'}; bottom: -25px;">${formatPower(grid_p)}</div>
+              </div>
+              
               <div class="node n-batt neon-border-green" style="top: 76.2%; left: 80%;">
-                <ha-icon icon="mdi:battery-high"></ha-icon>
-                ${battery_soc ? html`<div class="soc-tag neon-bg-green">${battery_soc}%</div>` : ''}
-                ${Math.abs(batt_p) > 1 ? html`<div class="power-tag neon-bg-green">${batt_p > 0 ? '⚡' : '⇣'} ${Math.abs(batt_p).toFixed(0)}W</div>` : ''}
+                <ha-icon icon="${battery_soc > 20 ? 'mdi:battery-high' : 'mdi:battery-low'}"></ha-icon>
+                <div class="batt-bar-wrap">
+                   <div class="batt-bar-fill" style="height: ${battery_soc}%"></div>
+                </div>
+                <div class="soc-tag neon-bg-green">${battery_soc.toFixed(0)}%</div>
+                ${Math.abs(batt_p) > 5 ? html`<div class="power-tag neon-bg-green" style="bottom: -25px;">${batt_p > 0 ? 'LADEN' : 'ENTLADEN'}</div>` : ''}
               </div>
 
               <!-- Sub Consumers Area -->
@@ -586,35 +607,13 @@ class HoymilesCYDPanel extends LitElement {
     })}
               </div>
               ` : ''}
-
-              <div class="gauge-center">
-                <div class="g-ring"></div>
-                <div class="g-arc" style="transform: rotate(${gauge_deg}deg)"></div>
-                <div class="g-inner">
-                   <div class="g-cap">NETZBILANZ</div>
-                   <div class="g-main">${Math.abs(grid_p).toFixed(0)}<span style="font-size: 0.4em; margin-left: 4px;">W</span></div>
-                   <div class="g-stat ${grid_p >= 0 ? 'red' : 'green'}">
-                      <ha-icon icon="${grid_p >= 0 ? 'mdi:arrow-down-bold' : 'mdi:arrow-up-bold'}"></ha-icon>
-                      ${grid_p >= 0 ? 'IMPORT' : 'EXPORT'}
-                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="flow-legend">
-              <div class="leg-item"><span class="dot neon-orange-bg"></span> Solar</div>
-              <div class="leg-item"><span class="dot neon-blue-bg"></span> ${this.config.operation_mode === 'base_load' ? 'Grundlast' : 'Haus'}</div>
-              <div class="leg-item"><span class="dot neon-pink-bg"></span> Netz Import</div>
-              <div class="leg-item"><span class="dot neon-cyan-bg"></span> Netz Export</div>
-              <div class="leg-item"><span class="dot neon-green-bg"></span> Batterie</div>
             </div>
           </div>
 
-
           <div class="graph-area">
              <div class="graph-info">
-               <span>ENERGIEMESSUNG (NETZLEISTUNG)</span>
-               <span class="range">LETZTE STUNDE</span>
+               <span>NETZ-LEISTUNGSVERLAUF (1h)</span>
+               <span class="range">Echtzeit</span>
              </div>
              <div class="canvas">
                 <svg viewBox="0 0 500 120" preserveAspectRatio="none">
@@ -627,40 +626,70 @@ class HoymilesCYDPanel extends LitElement {
 
         <div class="sidebar">
           <div class="side-card glass">
-            <div class="s-cap">WECHSELRICHTER STATUS</div>
+            <div class="s-cap">SYSTEMSTATUS</div>
             <div class="s-flex">
-              <div class="s-icon"><ha-icon icon="mdi:server-network"></ha-icon></div>
+              <div class="s-icon orange"><ha-icon icon="mdi:shield-check-outline"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Status</span> <span class="green">AKTIV ●</span></div>
-                <div class="s-row"><span>Heute Ertrag</span> <span>${yield_today.toFixed(2)} kWh</span></div>
-                <div class="s-row"><span>Temperatur</span> <span>${inverter_temp}°C</span></div>
+                <div class="s-row"><span>Status</span> <span class="green">AKTIV</span></div>
+                <div class="s-row"><span>WR Temp</span> <span>${inverter_temp}°C</span></div>
+                <div class="s-row"><span>DTU Version</span> <span>${this._currentVersion}</span></div>
               </div>
             </div>
           </div>
 
           <div class="side-card glass">
-            <div class="s-cap">ENERGIE FLÜSSE</div>
+            <div class="s-cap">BILANZ HEUTE</div>
             <div class="s-flex">
-              <div class="s-icon orange"><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
+              <div class="s-icon"><ha-icon icon="mdi:finance"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Netz Bezug</span> <span>${import_today.toFixed(2)} kWh</span></div>
-                <div class="s-row"><span>Netz Einspeisung</span> <span>${export_today.toFixed(2)} kWh</span></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="side-card glass">
-            <div class="s-cap">STEUERUNG (ZEN)</div>
-            <div class="s-flex">
-              <div class="s-icon orange"><ha-icon icon="mdi:target-variant"></ha-icon></div>
-              <div class="s-vals">
-                <div class="s-row"><span>Leistungslimit</span> <span>${control_limit}${((this.config.inverter_type !== 'hoymiles' && this.config.generic_limit_type === 'watt') ? 'W' : '%')}</span></div>
-                <div class="s-row"><span>Effizienz</span> <span class="orange">OPTIMAL</span></div>
+                <div class="s-row"><span>Autarkie</span> <span class="green">${Math.min(100, (yield_today / (import_today + yield_today - export_today + 0.001) * 100)).toFixed(1)}%</span></div>
+                <div class="s-row"><span>Eigenverbrauch</span> <span>${Math.min(100, ((yield_today - export_today) / (yield_today + 0.001) * 100)).toFixed(1)}%</span></div>
               </div>
             </div>
           </div>
         </div>
       </div>
+    `;
+  }
+
+  _renderSunArc() {
+    if (this._sunPos === -1) return ''; // Night
+    
+    // Path: M 35,78 Q 260,-45 485,78
+    // We calculate position along this quadratic bezier curve.
+    // Progress is this._sunPos (0 to 1)
+    const t = this._sunPos;
+    const x = (1-t)**2 * 35 + 2*(1-t)*t * 260 + t**2 * 485;
+    const y = (1-t)**2 * 78 + 2*(1-t)*t * (-45) + t**2 * 78;
+
+    return html`
+      <div class="sun-arc-wrap">
+        <svg viewBox="0 0 520 100" style="overflow: visible;">
+          <path d="M 35,78 Q 260,-45 485,78" class="sun-arc-path" />
+          <g style="transform: translate(${x}px, ${y}px)">
+            <circle r="6" fill="#ff9d00" class="sun-icon" />
+            <circle r="12" fill="rgba(255,157,0,0.2)" />
+          </g>
+        </svg>
+      </div>
+    `;
+  }
+
+  _renderFlowParticles(path, power, colorClass) {
+    if (power < 10) return '';
+    
+    // Speed based on power
+    const dur = Math.max(0.5, 4 - (power / 500));
+    const count = Math.min(6, Math.ceil(power / 100));
+    
+    return html`
+      <g>
+        ${Array.from({ length: count }).map((_, i) => html`
+          <circle r="3" class="particle ${colorClass}" filter="url(#neonGlow)">
+            <animateMotion dur="${dur}s" repeatCount="indefinite" path="${path}" begin="${i * (dur/count)}s" />
+          </circle>
+        `)}
+      </g>
     `;
   }
 
@@ -1313,6 +1342,46 @@ class HoymilesCYDPanel extends LitElement {
       .neon-border-blue { border-color: var(--neon-blue) !important; box-shadow: 0 0 15px rgba(0, 210, 255, 0.2) !important; color: var(--neon-blue); }
       .neon-border-pink { border-color: var(--neon-pink) !important; box-shadow: 0 0 15px rgba(255, 0, 127, 0.2) !important; color: var(--neon-pink); }
       .neon-border-green { border-color: var(--neon-green) !important; box-shadow: 0 0 15px rgba(57, 255, 20, 0.2) !important; color: var(--neon-green); }
+      
+      /* --- K-FLOW SPECIFIC STYLES --- */
+      .sun-arc-wrap { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 550px; height: 120px; z-index: 1; pointer-events: none; }
+      .sun-arc-path { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 2; stroke-dasharray: 4 6; }
+      .sun-icon { filter: drop-shadow(0 0 10px #ff9d00); transition: all 1s ease; }
+      
+      .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; position: relative; z-index: 10; }
+      .sum-card { 
+        background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); border-radius: 16px; padding: 15px;
+        display: flex; flex-direction: column; align-items: center; text-align: center;
+        transition: 0.3s;
+      }
+      .sum-card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.03); }
+      .sum-label { font-size: 0.65em; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+      .sum-value { font-size: 1.3em; font-weight: 800; color: #fff; font-family: 'JetBrains Mono', monospace; }
+      .sum-unit { font-size: 0.6em; margin-left: 2px; color: var(--text-dim); }
+      
+      .inverter-hub {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 140px; height: 140px; background: #0a0a0c; border: 2px solid var(--accent);
+        border-radius: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        box-shadow: 0 0 30px rgba(247, 147, 26, 0.2), inset 0 0 20px rgba(0,0,0,0.8);
+        z-index: 20; transition: 0.4s;
+      }
+      .inverter-hub:hover { transform: translate(-50%, -50%) scale(1.05); }
+      .hub-label { font-size: 0.6em; color: var(--text-dim); font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; }
+      .hub-value { font-size: 1.8em; font-weight: 900; color: #fff; line-height: 1; }
+      .hub-unit { font-size: 0.4em; }
+      .hub-status { font-size: 0.55em; margin-top: 8px; padding: 2px 8px; border-radius: 6px; background: rgba(57, 255, 20, 0.1); color: var(--neon-green); font-weight: 800; }
+
+      .particle { animation: particle-move 3s linear infinite; }
+      @keyframes particle-move {
+        0% { offset-distance: 0%; opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { offset-distance: 100%; opacity: 0; }
+      }
+
+      .batt-bar-wrap { width: 12px; height: 40px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-top: 5px; border: 1px solid rgba(255,255,255,0.1); }
+      .batt-bar-fill { width: 100%; background: var(--neon-green); transition: height 1s ease; box-shadow: 0 0 10px var(--neon-green); }
       
       .status-badge {
         display: flex;
