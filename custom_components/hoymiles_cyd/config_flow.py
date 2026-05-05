@@ -78,9 +78,9 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
     ) -> FlowResult:
-        """Handle zeroconf discovery of a CYD display."""
+        """Handle zeroconf discovery of an OpenKairo display."""
         host = discovery_info.host
-        name = discovery_info.name or f"Hoymiles CYD @ {host}"
+        name = discovery_info.name or f"OpenKairo Nulleinspeisung @ {host}"
 
         # Avoid duplicate entries
         await self.async_set_unique_id(f"cyd_{host}")
@@ -94,7 +94,7 @@ class HoymilesInverterConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Confirm discovery of CYD display."""
+        """Confirm discovery of OpenKairo display."""
         if user_input is not None:
             host = self._discovered_host
             return self.async_create_entry(

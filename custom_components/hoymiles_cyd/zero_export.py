@@ -47,9 +47,10 @@ class ZeroExportManager:
         self._config = {}
         self._last_current_production = 0.0
         self._last_desired_production = 0.0
-        self._last_execution_time: float = 0.0
-        self._last_valid_production: float = 0.0
-        self._last_valid_load: float = 0.0
+        self._last_valid_load = 0.0
+        self._last_ramp_limit = -1.0
+        self._last_interval = 10.0
+        self._last_limit_watts = 0.0
 
     def add_state_change_callback(self, callback_func):
         """Add callback for state changes."""
@@ -215,6 +216,18 @@ class ZeroExportManager:
                 self._unsub = async_track_state_change_event(
                     self.hass, [self._grid_sensor], self._handle_grid_change
                 )
+            
+            # Phase tracking
+            phases = []
+            for i in range(1, 4):
+                p = self._config.get(f"grid_sensor_l{i}")
+                if p: phases.append(p)
+            
+            if phases:
+                _LOGGER.info(f"Zero Export: Tracking {len(phases)} phases for summing")
+                self._unsub_phases = async_track_state_change_event(
+                    self.hass, phases, self._handle_grid_change
+                )
         elif mode == "base_load":
             plugs = []
             for i in range(1, 7):
@@ -351,7 +364,7 @@ class ZeroExportManager:
         _LOGGER.debug(f"Zero Export (Base Load): Static + Plugs = {total_load}W, Target Offset = {self._target_watt}W, Desired = {desired_production}W")
         self._last_current_production = total_load
         self._last_desired_production = desired_production
-        await self._apply_production_limit(desired_production)
+        await self._apply_production_limit(desired_production, total_load)
 
     async def _handle_grid_change(self, event):
         """Handle grid sensor state change."""
@@ -363,10 +376,32 @@ class ZeroExportManager:
             return
 
         try:
-            grid_power = float(new_state.state)
-            scale = self._config.get("grid_power_scale")
-            if scale == "kw_to_w": grid_power *= 1000
-            elif scale == "w_to_kw": grid_power /= 1000
+            if event and event.data.get("new_state"):
+                # Standard single sensor change
+                grid_power = float(event.data.get("new_state").state)
+                scale = self._config.get("grid_power_scale")
+                if scale == "kw_to_w": grid_power *= 1000
+                elif scale == "w_to_kw": grid_power /= 1000
+            else:
+                # Summing mode or manual trigger
+                grid_power = 0.0
+                if self._grid_sensor:
+                    s = self.hass.states.get(self._grid_sensor)
+                    if s and s.state not in ("unavailable", "unknown"):
+                        grid_power = float(s.state)
+                else:
+                    # Sum phases
+                    for i in range(1, 4):
+                        p = self._config.get(f"grid_sensor_l{i}")
+                        if p:
+                            s = self.hass.states.get(p)
+                            if s and s.state not in ("unavailable", "unknown"):
+                                grid_power += float(s.state)
+                
+                scale = self._config.get("grid_power_scale")
+                if scale == "kw_to_w": grid_power *= 1000
+                elif scale == "w_to_kw": grid_power /= 1000
+
             self._last_valid_load = grid_power
         except (ValueError, TypeError):
             grid_power = self._last_valid_load
@@ -386,7 +421,7 @@ class ZeroExportManager:
             
         self._last_current_production = current_production
         self._last_desired_production = desired_production
-        await self._apply_production_limit(desired_production)
+        await self._apply_production_limit(desired_production, grid_power)
 
     def _get_current_production(self) -> float:
         """Get current solar power production."""
@@ -429,65 +464,110 @@ class ZeroExportManager:
         except Exception:
             return self._last_valid_production
 
-    async def _apply_production_limit(self, desired_production):
+    async def _apply_production_limit(self, desired_production, grid_power):
         """Calculate and set new power limit based on desired production (W)."""
         import time
         now = time.time()
         
         # Cooldown: only allow updates every X seconds to prevent oscillation
-        interval = getattr(self, '_zero_export_interval', 10.0)
+        interval = self._last_interval
         last_exec = float(getattr(self, '_last_execution_time', 0.0))
+        
+        # Check battery protection first
+        batt_sensor = self._config.get("battery_soc_sensor")
+        batt_enabled = self._config.get("battery_protection_enabled")
+        if batt_enabled and batt_sensor:
+            state = self.hass.states.get(batt_sensor)
+            if state and state.state not in ("unknown", "unavailable"):
+                try:
+                    soc = float(state.state)
+                    min_soc = float(self._config.get("battery_min_soc", 10))
+                    
+                    # --- NIGHT RESERVE ---
+                    night_enabled = self._config.get("night_reserve_enabled")
+                    if night_enabled:
+                        try:
+                            from datetime import datetime
+                            now_time = datetime.now().strftime("%H:%M")
+                            start_time = self._config.get("night_reserve_start_time", "18:00")
+                            if now_time >= start_time:
+                                night_soc = float(self._config.get("night_reserve_soc", 25))
+                                if night_soc > min_soc:
+                                    min_soc = night_soc
+                                    _LOGGER.debug(f"Night Reserve active: Raising min_soc to {min_soc}%")
+                        except Exception as e:
+                            _LOGGER.error(f"Error calculating night reserve: {e}")
+
+                    restart_soc = float(self._config.get("battery_restart_soc", 15))
+                    if restart_soc < min_soc: restart_soc = min_soc + 2 # Safety buffer
+                    
+                    if soc <= min_soc:
+                        if not self._battery_empty_mode:
+                            _LOGGER.info(f"Battery Protection: SOC {soc}% <= {min_soc}%. STOPPING export.")
+                        self._battery_empty_mode = True
+                    elif soc >= restart_soc:
+                        if self._battery_empty_mode:
+                            _LOGGER.info(f"Battery Protection: SOC {soc}% >= {restart_soc}%. RESUMING export.")
+                        self._battery_empty_mode = False
+                except ValueError:
+                    pass
+        
         if self._is_updating or (now - last_exec < interval and not self._battery_empty_mode):
             return
             
         self._is_updating = True
         self._last_execution_time = now
+        
         try:
             hass_data = self.hass.data[DOMAIN].get(self.entry.entry_id)
-            if not hass_data:
-                return
+            if not hass_data: return
 
             dtu = hass_data.get(HASS_DTU)
+            inv_type = self._config.get("inverter_type", "hoymiles")
             
-            # Safety: don't let desired production go below 0
+            # --- ADAPTIVE INTERVAL ---
+            target_lower = float(self._config.get("zero_export_target_lower", -10))
+            target_upper = float(self._config.get("zero_export_target_upper", 20))
+            
+            is_stable = target_lower <= grid_power <= target_upper
+            min_int = float(self._config.get("zero_export_min_interval", 5.0))
+            max_int = float(self._config.get("zero_export_max_interval", 60.0))
+            
+            self._last_interval = max_int if is_stable else min_int
+
+            # Check if we actually need to update (Range check)
+            if is_stable and self._last_limit is not None:
+                _LOGGER.debug(f"Zero Export: Grid power {grid_power}W within target range [{target_lower}, {target_upper}]. Skipping.")
+                return
+
+            # --- WETTER SCHUTZ ---
+            weather_enabled = self._config.get("weather_protection_enabled")
+            weather_sensor = self._config.get("weather_sensor")
+            if weather_enabled and weather_sensor:
+                w_state = self.hass.states.get(weather_sensor)
+                if w_state and w_state.state in ("rainy", "pouring", "cloudy", "thunderstorm", "snowy"):
+                    # Reduce desired production by 30% to keep battery reserve
+                    _LOGGER.info(f"Weather Protection: Forecast is {w_state.state}. Reducing discharge target to preserve battery.")
+                    desired_production *= 0.7
+
+            # --- RAMP LIMITING ---
+            ramp_rate = float(self._config.get("zero_export_ramp_rate", 50.0))
+            if ramp_rate > 0 and self._last_limit_watts > 0:
+                dt = now - last_exec
+                max_change = ramp_rate * dt
+                diff = desired_production - self._last_limit_watts
+                if abs(diff) > max_change:
+                    desired_production = self._last_limit_watts + (max_change if diff > 0 else -max_change)
+                    _LOGGER.debug(f"Zero Export: Ramp Limit. Capped to {desired_production}W")
+
             desired_production = max(0.0, desired_production)
             
-            # Batteryschutz (Battery Protection)
-            batt_sensor = self._config.get("battery_soc_sensor")
-            batt_enabled = self._config.get("battery_protection_enabled")
-            if batt_enabled and batt_sensor:
-                state = self.hass.states.get(batt_sensor)
-                if state and state.state not in ("unknown", "unavailable"):
-                    try:
-                        soc = float(state.state)
-                        min_soc = float(self._config.get("battery_min_soc", 10))
-                        restart_soc = float(self._config.get("battery_restart_soc", 15))
-                        
-                        if soc <= min_soc:
-                            if not self._battery_empty_mode:
-                                _LOGGER.info(f"Battery Protection: SOC {soc}% <= {min_soc}%. STOPPING export.")
-                            self._battery_empty_mode = True
-                        elif soc >= restart_soc:
-                            if self._battery_empty_mode:
-                                _LOGGER.info(f"Battery Protection: SOC {soc}% >= {restart_soc}%. RESUMING export.")
-                            self._battery_empty_mode = False
-                    except ValueError:
-                        pass
-            else:
-                # Protection disabled or no sensor: reset empty mode
-                self._battery_empty_mode = False
-            
-            # New Limit % = (Desired / MaxCapacity) * 100
-            new_limit = (desired_production / self._max_capacity) * 100
-            
-            # Apply constraints overrides for empty battery
+            # Calculate limits
             if self._battery_empty_mode:
                 final_percent = 0.0
                 final_watts = 0.0
             else:
                 final_percent = max(float(self._min_limit), min(float(self._max_limit), (desired_production / self._max_capacity) * 100))
-                if inv_type == "hoymiles":
-                    final_percent = min(100.0, final_percent)
                 min_watts = (float(self._min_limit) / 100.0) * float(self._max_capacity)
                 max_watts = (float(self._max_limit) / 100.0) * float(self._max_capacity)
                 final_watts = max(min_watts, min(max_watts, float(desired_production)))
@@ -495,77 +575,34 @@ class ZeroExportManager:
             final_percent = round(float(final_percent), 1)
             final_watts = int(round(float(final_watts), 0))
 
-            mode = self._config.get("operation_mode", "zero_export")
-            inv_type = self._config.get("inverter_type", "hoymiles")
-            
-            if mode == "disabled":
-                return
-
             limit_unit = self._config.get("generic_limit_type", "percent") if inv_type != "hoymiles" else "percent"
             current_target = final_watts if limit_unit == "watt" else final_percent
             
-            # Use configurable hysteresis (if in Watt mode, use W, else convert W to %)
-            if limit_unit == "watt":
-                jitter_threshold = self._hysteresis
-            else:
-                # Convert W hysteresis to % (approximate)
-                jitter_threshold = max(0.2, (self._hysteresis / self._max_capacity) * 100)
+            jitter_threshold = self._hysteresis if limit_unit == "watt" else max(0.2, (self._hysteresis / self._max_capacity) * 100)
             
-            # Avoid small jitter
-            last_limit_val = self._last_limit
-            if last_limit_val is None or abs(float(last_limit_val) - current_target) >= jitter_threshold:
+            if self._last_limit is None or abs(float(self._last_limit) - current_target) >= jitter_threshold:
                 if inv_type == "hoymiles" and dtu:
                     target_inverter = self._config.get("selected_inverter", "all")
-                    _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {final_percent}% (Watts: {final_watts}W, Target: {target_inverter})")
+                    _LOGGER.info(f"Zero Export (Hoymiles): Adjusting limit to {final_percent}% ({final_watts}W, Target: {target_inverter}, Int: {self._last_interval}s)")
                     if target_inverter == "all":
                         await dtu.async_set_power_limit(final_percent)
                     else:
-                        try:
-                            await dtu.async_set_power_limit(final_percent, [target_inverter])
-                        except Exception as e:
-                            _LOGGER.error(f"Failed to set limit for {target_inverter}: {e}")
-                            await dtu.async_set_power_limit(final_percent)
-                elif inv_type == "hoymiles" and not dtu:
-                     _LOGGER.error("Zero Export: Inverter type is Hoymiles but DTU object not found!")
+                        await dtu.async_set_power_limit(final_percent, [target_inverter])
                 elif inv_type != "hoymiles":
-                    # Generic / OpenDTU / AhoyDTU
                     limit_entity = self._config.get("external_limit_entity")
-                    if not limit_entity:
-                        _LOGGER.warning(f"Zero Export: External mode {inv_type} enabled but no limit entity configured")
-                        return
-                    
-                    domain_part = limit_entity.split('.')[0]
-                    
-                    # Check availability to avoid "Entity not found" errors (common at night)
-                    ent_state = self.hass.states.get(limit_entity)
-                    if not ent_state or ent_state.state in ("unavailable", "unknown"):
-                        if self._last_limit != -999.0: # Only log once
-                             _LOGGER.info(f"Zero Export: External inverter {limit_entity} is currently offline/unavailable (State: {ent_state.state if ent_state else 'None'}). Waiting for sunrise...")
-                             self._last_limit = -999.0 # Special state to indicate we are waiting
-                        return
-
-                    service = "set_value"
-                    service_data = {"entity_id": limit_entity, "value": current_target}
-                    
-                    if domain_part in ("select", "input_select"):
-                        service = "select_option"
-                        service_data = {"entity_id": limit_entity, "option": str(current_target)}
-                    
-                    _LOGGER.info(f"Zero Export (Generic): Setting {limit_entity} via {domain_part}.{service} to {current_target}")
-                    
-                    try:
-                        await self.hass.services.async_call(
-                            domain_part,
-                            service,
-                            service_data,
-                            blocking=True
-                        )
-                    except Exception as e:
-                        _LOGGER.error(f"Failed to call service {domain_part}.{service} for {limit_entity}: {e}")
+                    if limit_entity:
+                        ent_state = self.hass.states.get(limit_entity)
+                        if ent_state and ent_state.state not in ("unavailable", "unknown"):
+                            domain_part = limit_entity.split('.')[0]
+                            service = "select_option" if domain_part in ("select", "input_select") else "set_value"
+                            service_data = {"entity_id": limit_entity, ("option" if service == "select_option" else "value"): (str(current_target) if service == "select_option" else current_target)}
+                            
+                            _LOGGER.info(f"Zero Export ({inv_type}): Setting {limit_entity} to {current_target} (Int: {self._last_interval}s)")
+                            await self.hass.services.async_call(domain_part, service, service_data, blocking=True)
                 
                 self._last_limit = current_target
+                self._last_limit_watts = final_watts
                 self._trigger_callbacks()
-                
         except Exception as err:
             _LOGGER.error(f"Error in Zero Export adjustment: {err}")
         finally:

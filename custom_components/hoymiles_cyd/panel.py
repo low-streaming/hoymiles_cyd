@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, HASS_ZERO_EXPORT_MANAGER
 
-PANEL_TITLE = "Nulleinspeisung Steuerung"
+PANEL_TITLE = "OpenKairo Nulleinspeisung"
 PANEL_ICON = "mdi:solar-power-variant"
 
 # In-memory registry for connected CYD displays
@@ -104,7 +104,20 @@ class HoymilesCYDConfigView(HomeAssistantView):
                 "is_enabled": False,
                 "operation_mode": "zero_export",
                 "selected_inverter": "all",
-                "zero_export_interval": 10
+                "zero_export_interval": 10,
+                "zero_export_min_interval": 5,
+                "zero_export_max_interval": 60,
+                "zero_export_ramp_rate": 50,
+                "zero_export_target_lower": -10,
+                "zero_export_target_upper": 20,
+                "grid_sensor_l1": "",
+                "grid_sensor_l2": "",
+                "grid_sensor_l3": "",
+                "weather_sensor": "",
+                "weather_protection_enabled": false,
+                "night_reserve_enabled": false,
+                "night_reserve_soc": 25,
+                "night_reserve_start_time": "18:00"
             }
 
         config = await hass.async_add_executor_job(read_config)

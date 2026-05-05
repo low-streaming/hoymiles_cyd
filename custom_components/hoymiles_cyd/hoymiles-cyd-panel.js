@@ -95,12 +95,12 @@ class HoymilesEntityPicker extends LitElement {
       :host { display: block; margin-bottom: 20px; position: relative; z-index: 1; }
       :host([open]) { z-index: 9999; }
       .picker-wrapper { position: relative; }
-      label { display: block; font-size: 0.75em; color: #888; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; }
+      label { display: block; font-size: 0.75em; color: var(--text-dim); margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
       .input-box { 
-        background: rgba(15, 15, 20, 0.9); 
-        border: 1px solid rgba(255,255,255,0.1); 
+        background: rgba(0, 0, 0, 0.4); 
+        border: 1px solid var(--glass-border); 
         padding: 12px 18px; 
-        border-radius: 10px; 
+        border-radius: 12px; 
         cursor: pointer; 
         display: flex; 
         justify-content: space-between; 
@@ -109,28 +109,30 @@ class HoymilesEntityPicker extends LitElement {
         color: #fff;
       }
       .picker-icons { display: flex; align-items: center; gap: 8px; }
-      .picker-icons ha-icon { --mdc-icon-size: 18px; color: #888; }
-      .picker-icons ha-icon:hover { color: #F7931A; }
-      .input-box:hover { border-color: #F7931A; background: rgba(30,30,35,0.9); }
-      .placeholder { color: #444; }
+      .picker-icons ha-icon { --mdc-icon-size: 18px; color: var(--text-dim); }
+      .picker-icons ha-icon:hover { color: var(--kairo-gold); }
+      .input-box:hover { border-color: var(--kairo-gold); background: rgba(255,255,255,0.03); }
+      .placeholder { color: #555; }
       .dropdown { 
         position: absolute; top: 100%; left: 0; right: 0; z-index: 9999; 
-        margin-top: 5px; max-height: 300px; display: flex; flex-direction: column;
-        border: 1px solid #F7931A; border-radius: 10px; overflow: hidden;
+        margin-top: 8px; max-height: 300px; display: flex; flex-direction: column;
+        border: 1px solid var(--kairo-gold); border-radius: 12px; overflow: hidden;
+        box-shadow: 0 15px 50px rgba(0,0,0,0.8);
       }
-      .glass-dark { background: #0c0c0e; box-shadow: 0 15px 50px rgba(0,0,0,0.9); }
-      .search-wrap { display: flex; align-items: center; background: #000; padding: 0 10px; border-bottom: 1px solid #222; }
+      .glass-dark { background: #0c0c0e; backdrop-filter: blur(20px); }
+      .search-wrap { display: flex; align-items: center; background: #000; padding: 0 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
       input { 
         background: transparent; border: none; 
         padding: 12px; color: #fff; width: 100%; box-sizing: border-box; outline: none;
+        font-family: inherit;
       }
       .list { overflow-y: auto; flex: 1; }
-      .item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
+      .item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
       .item:hover { background: rgba(247, 147, 26, 0.1); }
-      .item.selected { border-left: 3px solid #F7931A; background: rgba(247, 147, 26, 0.1); }
-      .name { font-size: 0.9em; font-weight: bold; }
-      .id { font-size: 0.7em; color: #555; font-family: monospace; }
-      .empty { padding: 20px; text-align: center; color: #444; }
+      .item.selected { border-left: 3px solid var(--kairo-gold); background: rgba(247, 147, 26, 0.1); }
+      .name { font-size: 0.9em; font-weight: bold; color: #fff; }
+      .id { font-size: 0.7em; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+      .empty { padding: 20px; text-align: center; color: var(--text-dim); }
     `;
   }
 }
@@ -407,11 +409,17 @@ class HoymilesCYDPanel extends LitElement {
 
     return html`
       <div class="panel-container">
+        <div class="cyber-grid"></div>
         <div class="header">
           <div class="logo-area">
-            <div class="logo-icon">⚡</div>
+            <div class="logo-icon-kairo">
+               <svg viewBox="0 0 100 100" class="k-logo">
+                  <path d="M20 20 L20 80 M20 50 L60 20 M20 50 L60 80" stroke="var(--kairo-cyan)" stroke-width="12" stroke-linecap="round" fill="none" filter="url(#neonGlow)"/>
+                  <circle cx="70" cy="50" r="10" fill="var(--kairo-gold)" filter="url(#neonGlow)"/>
+               </svg>
+            </div>
             <div class="logo-text">
-              <h1>SYSTEM: S_STEUERUNG</h1>
+              <h1>OPENKAIRO <span style="color: var(--kairo-cyan); opacity: 0.7;">PRO</span></h1>
               <div class="status-badge">
                 <span class="status-dot ${zero_export_status.includes('Läuft') ? 'active' : ''}"></span>
                 <span class="status-text">${zero_export_status.toUpperCase()}</span>
@@ -419,7 +427,8 @@ class HoymilesCYDPanel extends LitElement {
             </div>
           </div>
           <div class="time-area">
-            ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} | ${new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+            <ha-icon icon="mdi:clock-outline" style="margin-right: 8px; color: var(--kairo-cyan);"></ha-icon>
+            ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} | ${new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit' }).toUpperCase()}
           </div>
         </div>
 
@@ -871,13 +880,43 @@ class HoymilesCYDPanel extends LitElement {
 
               <div class="cfg-row">
                  <div class="cfg-info">
-                    <div class="cfg-label">Regel-Intervall</div>
-                    <div class="cfg-desc">Wartezeit zwischen zwei Befehlen in Sekunden (z.B. 10s).</div>
+                    <div class="cfg-label">Regel-Intervall (Bereich)</div>
+                    <div class="cfg-desc">Intervall passt sich an. Min für schnelle Reaktion, Max für Hardware-Schonung.</div>
+                 </div>
+                 <div class="input-wrap" style="flex-direction: row; gap: 10px;">
+                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_min_interval || 5}"
+                      @change="${(e) => this.config = { ...this.config, zero_export_min_interval: e.target.value }}">
+                    <span>bis</span>
+                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_max_interval || 60}"
+                      @change="${(e) => this.config = { ...this.config, zero_export_max_interval: e.target.value }}">
+                    <span class="unit-tag">s</span>
+                 </div>
+              </div>
+
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Sanftanlauf (Ramp-Rate)</div>
+                    <div class="cfg-desc">Max. Leistungsänderung pro Sekunde (W/s). Verhindert extreme Sprünge.</div>
                  </div>
                  <div class="input-wrap">
-                    <input type="number" class="cfg-num" .value="${this.config.zero_export_interval || 10}"
-                      @change="${(e) => this.config = { ...this.config, zero_export_interval: e.target.value }}">
-                    <span class="unit-tag">s</span>
+                    <input type="number" class="cfg-num" .value="${this.config.zero_export_ramp_rate || 50}"
+                      @change="${(e) => this.config = { ...this.config, zero_export_ramp_rate: e.target.value }}">
+                    <span class="unit-tag">W/s</span>
+                 </div>
+              </div>
+
+              <div class="cfg-row">
+                 <div class="cfg-info">
+                    <div class="cfg-label">Ziel-Bereich (Watt)</div>
+                    <div class="cfg-desc">Bereich am Zähler, in dem NICHT nachgeregelt wird (Min bis Max).</div>
+                 </div>
+                 <div class="input-wrap" style="flex-direction: row; gap: 10px;">
+                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_target_lower || -10}"
+                      @change="${(e) => this.config = { ...this.config, zero_export_target_lower: e.target.value }}">
+                    <span>bis</span>
+                    <input type="number" class="cfg-num" style="width: 60px;" .value="${this.config.zero_export_target_upper || 20}"
+                      @change="${(e) => this.config = { ...this.config, zero_export_target_upper: e.target.value }}">
+                    <span class="unit-tag">W</span>
                  </div>
               </div>
             </div>
@@ -919,24 +958,75 @@ class HoymilesCYDPanel extends LitElement {
                     <span class="unit-tag">%</span>
                  </div>
               </div>
-              ` : ''}
-              
-              <div style="flex: 1;"></div>
-           </div>
+               <div class="cfg-row" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Nacht-Reserve (SOC %)</div>
+                     <div class="cfg-desc">Erhöht den Batterieschutz ab einer bestimmten Uhrzeit.</div>
+                  </div>
+                  <ha-switch .checked="${this.config.night_reserve_enabled || false}"
+                    @change="${(e) => { this.config = { ...this.config, night_reserve_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+               </div>
+               ${this.config.night_reserve_enabled ? html`
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Reserve ab (Uhrzeit)</div>
+                     <div class="cfg-desc">Ab wann soll die Nacht-Reserve greifen?</div>
+                  </div>
+                  <input type="time" class="cfg-num" style="width: 100px;" .value="${this.config.night_reserve_start_time || '18:00'}"
+                    @change="${(e) => this.config = { ...this.config, night_reserve_start_time: e.target.value }}">
+               </div>
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Nacht-SOC (%)</div>
+                     <div class="cfg-desc">Ziel-SOC für die Nacht-Reserve.</div>
+                  </div>
+                  <div class="input-wrap">
+                     <input type="number" class="cfg-num" .value="${this.config.night_reserve_soc || 25}"
+                       @change="${(e) => this.config = { ...this.config, night_reserve_soc: e.target.value }}">
+                     <span class="unit-tag">%</span>
+                  </div>
+               </div>
+               ` : ''}
+               
+               <div style="flex: 1;"></div>
+            </div>
 
-           <!-- INFO PANEL -->
-           <div class="config-section glass" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(0, 210, 255, 0.03); border-color: rgba(0, 210, 255, 0.2); box-shadow: 0 0 30px rgba(0, 210, 255, 0.05) inset; padding: 40px;">
-              <div style="background: rgba(0, 210, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; border: 1px solid rgba(0, 210, 255, 0.3);">
-                 <ha-icon icon="mdi:brain" style="font-size: 3em; color: var(--neon-blue); filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.5));"></ha-icon>
-              </div>
-              <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 1.3em; letter-spacing: 2px;">DIE ZEN AUTOMATIK</h3>
-              <p style="color: var(--text-dim); line-height: 1.7; margin: 0; font-size: 0.95em;">
-                Der <strong style="color: #fff;">Z</strong>ero <strong style="color: #fff;">E</strong>xport <strong style="color: #fff;">N</strong>etwork Algorithmus überwacht sekündlich deinen Stromzähler. Er kalkuliert den Echtzeit-Verbrauch und dynamisiert das Limit deiner Wechselrichter – das Netz bleibt sicher, dein Heim ertragsstark!
-              </p>
-           </div>
-        </div>
+            <!-- WETTER OPTIMIERUNG -->
+            <div class="config-section glass">
+               <div class="section-title"><ha-icon icon="mdi:weather-partly-cloudy"></ha-icon> WETTER-INTELIGENZ</div>
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Wetter-Schutz aktivieren</div>
+                     <div class="cfg-desc">Reduziert Entladung bei schlechtem Wetter-Forecast.</div>
+                  </div>
+                  <ha-switch .checked="${this.config.weather_protection_enabled || false}"
+                    @change="${(e) => { this.config = { ...this.config, weather_protection_enabled: e.target.checked }; this.requestUpdate(); }}"></ha-switch>
+               </div>
+               ${this.config.weather_protection_enabled ? html`
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Wetter-Entität</div>
+                     <div class="cfg-desc">Wähle deine Wetter-Vorhersage (z.B. weather.home).</div>
+                  </div>
+                  <hoymiles-entity-picker .hass="${this.hass}" label="Wetter wählen" .value="${this.config.weather_sensor}"
+                    @value-changed="${(e) => this.config = { ...this.config, weather_sensor: e.detail.value }}"></hoymiles-entity-picker>
+               </div>
+               ` : ''}
+            </div>
 
-        <!-- SENSORIK Sektion -->
+            <!-- INFO PANEL -->
+            <div class="config-section glass" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(0, 210, 255, 0.03); border-color: rgba(0, 210, 255, 0.2); box-shadow: 0 0 30px rgba(0, 210, 255, 0.05) inset; padding: 40px;">
+               <div style="background: rgba(0, 210, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; border: 1px solid rgba(0, 210, 255, 0.3);">
+                  <ha-icon icon="mdi:brain" style="font-size: 3em; color: var(--neon-blue); filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.5));"></ha-icon>
+               </div>
+               <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 1.3em; letter-spacing: 2px;">DIE ZEN AUTOMATIK</h3>
+               <p style="color: var(--text-dim); line-height: 1.7; margin: 0; font-size: 0.95em;">
+                 Der <strong style="color: #fff;">Z</strong>ero <strong style="color: #fff;">E</strong>xport <strong style="color: #fff;">N</strong>etwork Algorithmus überwacht sekündlich deinen Stromzähler. Er kalkuliert den Echtzeit-Verbrauch und dynamisiert das Limit deiner Wechselrichter – das Netz bleibt sicher, dein Heim ertragsstark!
+               </p>
+            </div>
+         </div>
+
+         <!-- SENSORIK Sektion -->
         <div class="config-section glass sensor-section">
            <div class="section-title"><ha-icon icon="mdi:nas"></ha-icon> SENSOR ZUORDNUNG</div>
            <p class="section-lead">Wähle hier deine Home Assistant Sensoren aus. Die Skalierung erlaubt die Umrechnung von kW zu W.</p>
@@ -985,6 +1075,29 @@ class HoymilesCYDPanel extends LitElement {
                 <div class="p-head"><ha-icon icon="mdi:battery-charging"></ha-icon> Batterie Leistung (W)</div>
                 <hoymiles-entity-picker .hass="${this.hass}" label="Entität wählen" .value="${this.config.battery_power_sensor}"
                   @value-changed="${(e) => this.config = { ...this.config, battery_power_sensor: e.detail.value }}"></hoymiles-entity-picker>
+              </div>
+
+              <!-- PHASEN-SALDIERUNG (Advanced) -->
+              <div class="p-card" style="grid-column: span 2;">
+                <div class="p-head"><ha-icon icon="mdi:calculator"></ha-icon> Phasen-Saldierung (Optional)</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+                   <div>
+                     <label style="font-size: 0.7em; color: var(--text-dim);">Phase L1</label>
+                     <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l1}"
+                       @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l1: e.detail.value }}"></hoymiles-entity-picker>
+                   </div>
+                   <div>
+                     <label style="font-size: 0.7em; color: var(--text-dim);">Phase L2</label>
+                     <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l2}"
+                       @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l2: e.detail.value }}"></hoymiles-entity-picker>
+                   </div>
+                   <div>
+                     <label style="font-size: 0.7em; color: var(--text-dim);">Phase L3</label>
+                     <hoymiles-entity-picker .hass="${this.hass}" .value="${this.config.grid_sensor_l3}"
+                       @value-changed="${(e) => this.config = { ...this.config, grid_sensor_l3: e.detail.value }}"></hoymiles-entity-picker>
+                   </div>
+                </div>
+                <p style="font-size: 0.7em; color: var(--text-dim); margin-top: 10px;">Nur ausfüllen, wenn keine Summen-Entität oben gewählt wurde.</p>
               </div>
 
               <div class="p-card">
@@ -1300,24 +1413,30 @@ class HoymilesCYDPanel extends LitElement {
       @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
       :host { 
-        display: block; 
-        background: radial-gradient(circle at 50% -20%, #1a1a1f 0%, #050505 100%);
-        color: #f0f0f0; 
-        min-height: 100vh; 
-        padding-bottom: 50px;
-        font-family: 'Outfit', sans-serif; 
-        --accent: #F7931A; 
-        --accent-glow: rgba(247, 147, 26, 0.4);
-        --bg-panel: rgba(18, 18, 22, 0.75);
-        --glass-border: rgba(255, 255, 255, 0.08);
-        --text-dim: #8e8e93;
+        --kairo-cyan: #00f2ff;
+        --kairo-gold: #F7931A;
+        --kairo-bg: #050508;
+        --kairo-surface: rgba(15, 18, 25, 0.85);
+        --kairo-glass-border: rgba(255, 255, 255, 0.08);
+        --kairo-neon-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
         
-        --neon-orange: #ff9d00;
-        --neon-blue: #00d2ff;
+        --accent: var(--kairo-gold);
+        --accent-glow: rgba(247, 147, 26, 0.3);
+        --neon-blue: var(--kairo-cyan);
         --neon-green: #39ff14;
         --neon-pink: #ff007f;
-        --neon-cyan: #00f3ff;
+        --neon-cyan: var(--kairo-cyan);
+        --neon-orange: var(--kairo-gold);
+        --text-main: #ffffff;
+        --text-dim: #94a3b8;
+        --bg-panel: var(--kairo-surface);
+        --glass-border: var(--kairo-glass-border);
         
+        display: block;
+        min-height: 100vh;
+        background: var(--kairo-bg);
+        color: var(--text-main);
+        font-family: 'Outfit', sans-serif;
         overflow-x: hidden;
       }
 
@@ -1444,20 +1563,26 @@ class HoymilesCYDPanel extends LitElement {
       /* --- HEADER --- */
       .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
       .logo-area { display: flex; align-items: center; gap: 20px; }
-      .logo-icon { 
-        font-size: 1.8em; background: linear-gradient(135deg, var(--accent) 0%, #ff6e00 100%); 
-        width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; 
-        border-radius: 16px; box-shadow: 0 8px 30px var(--accent-glow); color: #fff; 
-        animation: pulse-glow 3s infinite;
+      .logo-icon-kairo { 
+        width: 60px; height: 60px; position: relative;
       }
-      @keyframes pulse-glow { 
-        0%, 100% { box-shadow: 0 0 20px var(--accent-glow); transform: scale(1); } 
-        50% { box-shadow: 0 0 40px var(--accent-glow); transform: scale(1.02); } 
+      .k-logo { width: 100%; height: 100%; overflow: visible; }
+      
+      .logo-text h1 { 
+        margin: 0; font-size: 1.6em; letter-spacing: 4px; font-weight: 900; 
+        color: #fff; text-transform: uppercase; 
+        filter: drop-shadow(0 0 10px rgba(0, 242, 255, 0.2));
       }
-      .logo-text h1 { margin: 0; font-size: 1.4em; letter-spacing: 2px; font-weight: 800; color: #fff; text-transform: uppercase; }
-      .version-tag { font-size: 0.75em; color: var(--accent); font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
-      .version-tag::before { content: ''; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: inline-block; box-shadow: 0 0 10px var(--accent); }
-      .time-area { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: var(--text-dim); background: rgba(255,255,255,0.03); padding: 8px 16px; border-radius: 12px; border: 1px solid var(--glass-border); }
+      .status-badge { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+      .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 10px #ff4d4d; }
+      .status-dot.active { background: var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
+      .status-text { font-size: 0.7em; font-weight: 800; color: var(--text-dim); letter-spacing: 1px; }
+
+      .time-area { 
+        font-family: 'JetBrains Mono', monospace; font-size: 0.85em; color: var(--text-dim); 
+        background: rgba(0, 242, 255, 0.05); padding: 10px 20px; border-radius: 15px; 
+        border: 1px solid rgba(0, 242, 255, 0.1); display: flex; align-items: center;
+      }
 
       @media (max-width: 600px) {
         .header { flex-direction: column; align-items: flex-start; gap: 20px; }
