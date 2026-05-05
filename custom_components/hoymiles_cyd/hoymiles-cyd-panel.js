@@ -1219,64 +1219,29 @@ class HoymilesCYDPanel extends LitElement {
   }
 
   renderDisplayUpdate() {
-    const displays = Object.entries(this._connectedDisplays);
-    
     return html`
       <div class="dashboard-layout animate-fade-in">
-        <div class="main-card glass" style="max-width: 900px; margin: 0 auto; padding: 30px;">
-          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 20px;">
-            <ha-icon icon="mdi:cellphone-link-centralized" style="font-size: 2em; color: var(--accent);"></ha-icon>
-            <div>
-              <h2 style="margin: 0; font-size: 1.25em; font-weight: 800; letter-spacing: 1px;">DISPLAY FIRMWARE</h2>
-              <p style="margin: 3px 0 0; font-size: 0.8em; color: var(--text-dim);">Aktive CYD Solar Displays im Netzwerk.</p>
-            </div>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 15px;">
-            ${displays.length === 0 ? html`
-              <div style="text-align: center; padding: 60px 20px; color: var(--text-dim); background: rgba(0,0,0,0.1); border-radius: 20px; border: 1px dashed rgba(255,255,255,0.1);">
-                <ha-icon icon="mdi:wifi-off" style="font-size: 2.5em; opacity: 0.3; margin-bottom: 15px;"></ha-icon>
-                <p style="margin: 0;">Keine aktiven Displays gefunden.<br/><small style="opacity: 0.6;">Stelle sicher, dass dein CYD eingeschaltet ist.</small></p>
-              </div>
-            ` : displays.map(([ip, data]) => {
-              const vNormal = (v) => v.startsWith('v') ? v.substring(1) : v;
-              const isUpToDate = vNormal(data.version) === vNormal(this._latestVersion);
-              return html`
-                <div class="glass-card" style="padding: 15px 20px; display: flex; align-items: center; gap: 20px; border: 1px solid ${isUpToDate ? 'rgba(57,255,20,0.1)' : 'var(--accent)'}; background: rgba(0,0,0,0.3); border-radius: 15px;">
-                  <div style="background: var(--glass-bg); padding: 10px; border-radius: 10px;">
-                    <ha-icon icon="mdi:cellphone-wireless" style="color: ${isUpToDate ? 'var(--neon-green)' : 'var(--accent)'}; font-size: 1.25em;"></ha-icon>
-                  </div>
-                  <div style="flex: 1;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 3px;">
-                      <span style="font-weight: 700; font-size: 1.05em;">CYD DISPLAY</span>
-                      <span style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-size: 0.7em; color: var(--text-dim); border: 1px solid rgba(255,255,255,0.05); font-family: 'JetBrains Mono';">
-                        ${ip}
-                      </span>
-                    </div>
-                    <div style="font-size: 0.8em; color: var(--text-dim);">
-                      Installiert: <strong style="color: #fff;">${data.version}</strong> | Verfügbar: <strong style="color: var(--accent);">${this._latestVersion || '...'}</strong>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    ${isUpToDate ? html`
-                      <div style="background: rgba(57,255,20,0.05); color: var(--neon-green); padding: 5px 12px; border-radius: 8px; font-size: 0.8em; border: 1px solid rgba(57,255,20,0.2); display: flex; align-items: center; gap: 6px;">
-                        <ha-icon icon="mdi:check-decagram" style="font-size: 16px;"></ha-icon> AKTUELL
-                      </div>
-                    ` : html`
-                      <button class="mega-save-btn" 
-                        style="padding: 8px 16px; background: var(--accent); color: #000; font-size: 0.75em; box-shadow: 0 0 15px rgba(247, 147, 26, 0.2); margin-top: 0; width: auto;"
-                        @click="${() => this._triggerDisplayUpdate(ip)}">
-                        <ha-icon icon="mdi:rocket-launch" style="font-size: 16px; margin-right: 6px;"></ha-icon>UPDATE
-                      </button>
-                    `}
-                  </div>
-                </div>
-              `;
-            })}
-          </div>
+        <div class="main-card glass" style="max-width: 900px; margin: 0 auto; padding: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(0, 242, 255, 0.03);">
+           <div style="background: rgba(0, 242, 255, 0.1); width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 30px; border: 1px solid rgba(0, 242, 255, 0.2); box-shadow: 0 0 30px rgba(0, 242, 255, 0.1);">
+              <ha-icon icon="mdi:tools" style="font-size: 3em; color: var(--kairo-cyan); filter: drop-shadow(0 0 10px rgba(0, 242, 255, 0.5));"></ha-icon>
+           </div>
+           <h2 style="color: #fff; margin: 0 0 10px 0; font-size: 2em; letter-spacing: 4px; font-weight: 900; text-transform: uppercase;">BALD VERFÜGBAR</h2>
+           <p style="color: var(--text-dim); line-height: 1.7; margin: 0; font-size: 1.1em; max-width: 500px;">
+             Die drahtlose Over-the-Air (OTA) Firmware-Verwaltung für deine OpenKairo Displays wird aktuell optimiert und steht in Kürze bereit.
+           </p>
+           <div style="margin-top: 40px; display: flex; gap: 10px;">
+              <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--kairo-cyan); animation: pulse 1.5s infinite;"></div>
+              <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--kairo-cyan); animation: pulse 1.5s infinite 0.3s;"></div>
+              <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--kairo-cyan); animation: pulse 1.5s infinite 0.6s;"></div>
+           </div>
         </div>
       </div>
+      <style>
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 0.3; }
+          50% { transform: scale(1.5); opacity: 1; }
+        }
+      </style>
     `;
   }
 
