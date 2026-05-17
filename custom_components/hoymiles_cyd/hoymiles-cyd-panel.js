@@ -12,7 +12,7 @@ class HoymilesEntityPicker extends LitElement {
       hass: { type: Object },
       label: { type: String },
       value: { type: String },
-      open: { type: Boolean },
+      open: { type: Boolean, reflect: true },
       search: { type: String },
       domain: { type: String }
     };
@@ -128,7 +128,9 @@ class HoymilesEntityPicker extends LitElement {
         font-family: inherit;
       }
       .list { overflow-y: auto; flex: 1; }
-      .item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
+      .item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); display: flex; flex-direction: column; gap: 4px; }
+      .item .name { font-size: 0.9em; font-weight: bold; color: #fff; }
+      .item .id { font-size: 0.75em; color: #8b949e; font-family: 'JetBrains Mono', monospace; word-break: break-all; }
       .item:hover { background: rgba(247, 147, 26, 0.1); }
       .item.selected { border-left: 3px solid var(--kairo-gold); background: rgba(247, 147, 26, 0.1); }
       .empty { padding: 20px; text-align: center; color: var(--text-dim); }
@@ -221,8 +223,13 @@ class HoymilesCYDPanel extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    if (this._updateEventUnsub) {
+    if (typeof this._updateEventUnsub === 'function') {
       this._updateEventUnsub();
+      this._updateEventUnsub = null;
+    } else if (this._updateEventUnsub instanceof Promise) {
+      this._updateEventUnsub.then(unsub => {
+        if (typeof unsub === 'function') unsub();
+      });
       this._updateEventUnsub = null;
     }
     if (this._historyInterval) {
@@ -435,6 +442,15 @@ class HoymilesCYDPanel extends LitElement {
                 <span class="status-text">${zero_status.toUpperCase()}</span>
               </div>
             </div>
+          </div>
+          <div class="global-zen-wrap ${this.config.is_enabled ? 'active' : ''}">
+             <div class="gz-icon"><ha-icon icon="mdi:power-standby"></ha-icon></div>
+             <div class="gz-text">
+               <div class="gz-title">ZEN-MODUS</div>
+               <div class="gz-status">${this.config.is_enabled ? 'AKTIV' : 'AUS'}</div>
+             </div>
+             <ha-switch .checked="${this.config.is_enabled || false}"
+               @change="${(e) => { this.config.is_enabled = e.target.checked; this._handleSwitchChange(e.target.checked); this.requestUpdate(); }}"></ha-switch>
           </div>
           <div class="time-area">
             <ha-icon icon="mdi:clock-outline" style="margin-right: 8px; color: var(--kairo-cyan);"></ha-icon>
@@ -860,7 +876,7 @@ class HoymilesCYDPanel extends LitElement {
                   <ha-switch .checked="${this.config.is_enabled || false}"
                     @change="${(e) => { this.config.is_enabled = e.target.checked; this._handleSwitchChange(e.target.checked); }}"></ha-switch>
                </div>
-
+               
                <div class="cfg-row">
                   <div class="cfg-info">
                      <div class="cfg-label">Hardware-System</div>
@@ -1028,7 +1044,7 @@ class HoymilesCYDPanel extends LitElement {
                         <div class="p-head">GERÄT ${i}</div>
                         <div class="cfg-compact-row">
                           <input type="text" class="cfg-text" placeholder="Name" .value="${this.config[`sub_consumer_${i}_name`]}" @input="${(e) => this.config[`sub_consumer_${i}_name`] = e.target.value}">
-                          <input type="text" class="cfg-text" placeholder="Icon (mdi:plug)" .value="${this.config[`sub_consumer_${i}_icon`]}" @input="${(e) => this.config[`sub_consumer_${i}_icon`] = e.target.value}">
+                          <input type="text" list="mdi-icons-list" class="cfg-text" placeholder="Icon (mdi:plug)" .value="${this.config[`sub_consumer_${i}_icon`]}" @input="${(e) => this.config[`sub_consumer_${i}_icon`] = e.target.value}">
                         </div>
                         <hoymiles-entity-picker .hass="${this.hass}" label="Sensor" .value="${this.config[`sub_consumer_${i}_sensor`]}" @value-changed="${(e) => this.config[`sub_consumer_${i}_sensor`] = e.detail.value}"></hoymiles-entity-picker>
                         <hoymiles-entity-picker .hass="${this.hass}" label="Schalter (Optional)" .domain="switch" .value="${this.config[`sub_consumer_${i}_toggle`]}" @value-changed="${(e) => this.config[`sub_consumer_${i}_toggle`] = e.detail.value}"></hoymiles-entity-picker>
@@ -1039,21 +1055,90 @@ class HoymilesCYDPanel extends LitElement {
              </div>
           ` : ''}
         </div>
+        <datalist id="mdi-icons-list">
+          <option value="mdi:power-plug">Stecker (Standard)</option>
+          <option value="mdi:bitcoin">Bitcoin Miner</option>
+          <option value="mdi:car-electric">E-Auto / Wallbox</option>
+          <option value="mdi:water-boiler">Boiler / Warmwasser</option>
+          <option value="mdi:heat-pump-outline">Wärmepumpe</option>
+          <option value="mdi:television">TV / Media</option>
+          <option value="mdi:desktop-pc">Computer / PC</option>
+          <option value="mdi:server">Server / NAS</option>
+          <option value="mdi:router-wireless">Router / Netzwerk</option>
+          <option value="mdi:washing-machine">Waschmaschine</option>
+          <option value="mdi:tumble-dryer">Trockner</option>
+          <option value="mdi:dishwasher">Spülmaschine</option>
+          <option value="mdi:fan">Lüfter / Klima</option>
+          <option value="mdi:lightbulb">Beleuchtung</option>
+          <option value="mdi:pool">Pool / Pumpe</option>
+          <option value="mdi:battery-charging">Akku / Batterie</option>
+        </datalist>
         <button class="mega-save-btn" @click="${this._saveConfig}"><ha-icon icon="mdi:content-save-check" style="margin-right:10px;"></ha-icon> EINSTELLUNGEN ÜBERNEHMEN</button>
       </div>
     `;
   }
 
-  renderDisplayUpdate() { return html`<div class="dashboard-layout"><div class="main-card glass" style="text-align:center; justify-content:center;"><h2>OTA UPDATES</h2><p style="color:var(--text-dim);">Drahtlose Firmware-Verwaltung in Kürze verfügbar.</p></div></div>`; }
+  renderDisplayUpdate() { 
+    return html`
+      <div class="settings-page animate-fade-in" style="text-align:center; padding-top: 80px;">
+         <div style="position:relative; display:inline-block; margin-bottom: 30px;">
+            <div style="position:absolute; inset:-30px; background:radial-gradient(circle, var(--kairo-cyan) 0%, transparent 70%); opacity:0.15; filter:blur(20px); border-radius:50%;"></div>
+            <ha-icon icon="mdi:monitor-dashboard" style="font-size: 8em; color: var(--kairo-cyan); filter: drop-shadow(0 0 25px var(--kairo-cyan));"></ha-icon>
+         </div>
+         <h1 style="font-size: 3.5em; font-weight: 900; letter-spacing: 6px; margin: 0; background: linear-gradient(90deg, #fff, var(--kairo-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">DISPLAYS & OTA</h1>
+         <p style="color: #8b949e; font-size: 1.2em; max-width: 600px; margin: 25px auto; line-height: 1.6;">
+            Die zentrale Verwaltung für externe OpenKairo Hardware-Displays und die drahtlose Firmware-Verteilung (OTA) befindet sich aktuell noch in der Entwicklung.
+         </p>
+         <div style="margin-top: 50px; display: inline-flex; align-items: center; gap: 15px; background: rgba(0,242,255,0.05); padding: 15px 35px; border-radius: 40px; border: 1px solid rgba(0,242,255,0.2); box-shadow: 0 0 30px rgba(0,242,255,0.05);">
+            <div class="status-dot active" style="width: 12px; height: 12px; box-shadow: 0 0 15px var(--kairo-cyan); background: var(--kairo-cyan);"></div>
+            <span style="font-weight: 900; letter-spacing: 3px; color: var(--kairo-cyan); font-size: 1.1em;">COMING SOON</span>
+         </div>
+      </div>
+    `; 
+  }
   
   renderHelp() {
     return html`
       <div class="settings-page animate-fade-in">
         <div class="setup-header"><div class="setup-title">HILFE & SUPPORT</div></div>
         <div class="help-grid">
-           <div class="help-section"><h4><ha-icon icon="mdi:rocket-launch"></ha-icon> SCHNELLSTART</h4><p>Konfiguriere unter <strong>SETUP -> Sensoren</strong> deinen Stromzähler und Wechselrichter. Aktiviere dann unter <strong>Allgemein</strong> die ZEN-Automatik.</p></div>
-           <div class="help-section"><h4><ha-icon icon="mdi:shield-check"></ha-icon> SICHERHEIT</h4><p>Das System regelt Limits nur innerhalb der von dir gesetzten Grenzen. Achte darauf, dass dein WR-Limit korrekt in Watt eingetragen ist.</p></div>
-           <div class="help-section"><h4><ha-icon icon="mdi:update"></ha-icon> UPDATES</h4><p>Aktuelle Version: <strong>v${this._currentVersion}</strong>. Updates können direkt über diese Oberfläche angestoßen werden, sobald verfügbar.</p></div>
+           <div class="help-section">
+             <h4><ha-icon icon="mdi:rocket-launch"></ha-icon> SCHNELLSTART</h4>
+             <p>Konfiguriere unter <strong>SETUP -> Sensoren</strong> deinen Stromzähler (Netzbezug/Einspeisung) und deinen Wechselrichter (Solarleistung). Aktiviere dann in der Menüleiste oben den <strong>ZEN-MODUS</strong>, um die Nulleinspeisung zu starten.</p>
+           </div>
+           <div class="help-section">
+             <h4><ha-icon icon="mdi:nas"></ha-icon> TAGESWERTE & BILANZ</h4>
+             <p>Damit die Autarkie- und Eigenverbrauchsanzeige im Dashboard funktioniert, müssen zwingend die Sensoren für <strong>Ertrag, Bezug und Einspeisung (Heute)</strong> unter SETUP in kWh oder Wh hinterlegt sein.</p>
+           </div>
+           <div class="help-section">
+             <h4><ha-icon icon="mdi:shield-check"></ha-icon> SICHERHEIT</h4>
+             <p>Das System regelt die Limits nur innerhalb der von dir gesetzten Grenzen (Min/Max). Achte darauf, dass unter SETUP -> Regelung das maximale Hardware-Limit (z.B. 800W) deines Wechselrichters korrekt eingetragen ist.</p>
+           </div>
+           <div class="help-section">
+             <h4><ha-icon icon="mdi:battery-charging"></ha-icon> BATTERIESCHUTZ</h4>
+             <p>Im Bereich Schutz kannst du verhindern, dass dein Akku komplett entladen wird. Die Einspeisung stoppt automatisch bei Erreichen des Min-SOC und startet erst wieder beim Restart-SOC.</p>
+           </div>
+           <div class="help-section">
+             <h4><ha-icon icon="mdi:update"></ha-icon> SYSTEM UPDATES</h4>
+             <p>Aktuelle Version: <strong>v${this._currentVersion}</strong>. Das OpenKairo System prüft automatisch auf Github nach Updates. Wenn ein Update verfügbar ist, erscheint ein Button zum direkten Download.</p>
+           </div>
+           <div class="help-section">
+             <h4><ha-icon icon="mdi:bug"></ha-icon> FEHLERBEHEBUNG</h4>
+             <p>Prüfe das <strong>REGLER-LOG</strong> unter dem Tab <strong>ANALYSE</strong>, wenn die Einspeisung nicht wie erwartet regelt. Dort siehst du die genauen mathematischen Entscheidungen des Algorithmus in Echtzeit.</p>
+           </div>
+        </div>
+
+        <div class="donate-section glass">
+          <div class="donate-content">
+            <ha-icon icon="mdi:rocket-launch" style="font-size: 3.5em; color: var(--kairo-gold);"></ha-icon>
+            <div class="donate-text">
+               <h3>OPENKAIRO SUPPORTER WERDEN</h3>
+               <p>Unterstütze die Entwicklung von OpenKairo! Mit einer einmaligen Spende oder einem <strong>Business / Supporter Abo</strong> sicherst du die stetige Weiterentwicklung und erhältst Zugang zu exklusiven Updates.</p>
+            </div>
+          </div>
+          <a class="donate-btn" href="https://www.paypal.com/donate/?cmd=_donations&business=info@low-streaming.de&currency_code=EUR&source=url&Z3JncnB0=" target="_blank">
+             <ha-icon icon="mdi:star-circle"></ha-icon> BUSINESS / SUPPORTER ABO
+          </a>
         </div>
       </div>
     `;
@@ -1096,6 +1181,15 @@ class HoymilesCYDPanel extends LitElement {
       .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
       .status-dot.active { background: var(--kairo-green); box-shadow: 0 0 10px var(--kairo-green); }
       .status-text { font-size: 0.7em; font-weight: 800; color: #8b949e; letter-spacing: 1px; }
+
+      .global-zen-wrap { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.05); padding: 8px 20px 8px 10px; border-radius: 30px; transition: 0.4s; backdrop-filter: blur(10px); }
+      .global-zen-wrap.active { border-color: var(--kairo-cyan); box-shadow: 0 0 20px rgba(0,242,255,0.1); background: rgba(0,242,255,0.05); }
+      .gz-icon { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; transition: 0.4s; color: #8b949e; }
+      .global-zen-wrap.active .gz-icon { background: rgba(0,242,255,0.15); color: var(--kairo-cyan); filter: drop-shadow(0 0 8px var(--kairo-cyan)); }
+      .gz-text { display: flex; flex-direction: column; }
+      .gz-title { font-size: 0.6em; font-weight: 900; letter-spacing: 1px; color: #8b949e; text-transform: uppercase; }
+      .gz-status { font-size: 0.85em; font-weight: 800; color: #fff; }
+      .global-zen-wrap.active .gz-status { color: var(--kairo-cyan); }
 
       .time-area { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; background: rgba(255,255,255,0.02); padding: 12px 24px; border-radius: 16px; border: 1px solid var(--kairo-glass-border); color: var(--kairo-cyan); }
 
@@ -1193,15 +1287,20 @@ class HoymilesCYDPanel extends LitElement {
       .sun-icon { filter: drop-shadow(0 0 15px #ff9d00); transition: 0.5s; }
       .arc-time-label { fill: #c9d1d9; font-size: 10px; font-family: 'JetBrains Mono'; font-weight: 800; transition: 0.5s; text-shadow: 0 0 5px rgba(0,0,0,0.5); }
 
-      .sub-consumers-wrap { position: absolute; top: 15%; right: 5%; display: flex; flex-direction: column; gap: 10px; z-index: 60; }
+      .sub-consumers-wrap { position: absolute; top: 50%; right: -30px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 12px; z-index: 60; background: rgba(10, 11, 16, 0.7); padding: 12px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
       @media (max-width: 600px) {
-        .sub-consumers-wrap { top: 10%; right: 2%; transform: scale(0.8); transform-origin: top right; }
+        .sub-consumers-wrap { top: auto; bottom: -20px; right: 50%; transform: translateX(50%) scale(0.85); flex-direction: row; padding: 10px; border-radius: 24px; }
       }
-      .sub-node { width: 50px; height: 50px; border-radius: 14px; background: #0d0e14; border: 1px solid var(--kairo-glass-border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; color: #8b949e; position: relative; }
-      .sub-node.on { border-color: var(--kairo-green); color: var(--kairo-green); box-shadow: 0 0 15px rgba(57,255,20,0.2); }
-      .sub-node .s-val { font-size: 0.65em; font-weight: 800; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
-      .sub-node .s-lab { position: absolute; right: 65px; background: rgba(0,0,0,0.9); padding: 6px 12px; border-radius: 8px; font-size: 0.75em; font-weight: 800; white-space: nowrap; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid var(--kairo-glass-border); }
+      .sub-node { width: 52px; height: 52px; border-radius: 16px; background: #05060b; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); color: #8b949e; position: relative; }
+      .sub-node:hover { background: rgba(255,255,255,0.05); transform: scale(1.08); z-index: 10; }
+      .sub-node.on { border-color: var(--kairo-green); color: var(--kairo-green); box-shadow: 0 0 20px rgba(57,255,20,0.15), inset 0 0 10px rgba(57,255,20,0.05); }
+      .sub-node .s-val { font-size: 0.65em; font-weight: 900; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+      .sub-node .s-lab { position: absolute; right: 70px; background: rgba(0,0,0,0.9); padding: 8px 14px; border-radius: 10px; font-size: 0.75em; font-weight: 800; white-space: nowrap; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid var(--kairo-glass-border); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
       .sub-node:hover .s-lab { opacity: 1; transform: translateX(-5px); }
+      @media (max-width: 600px) {
+        .sub-node .s-lab { right: auto; bottom: 70px; }
+        .sub-node:hover .s-lab { transform: translateY(-5px); }
+      }
 
       .sidebar { display: flex; flex-direction: column; gap: 30px; }
       .side-card { padding: 35px; }
@@ -1219,6 +1318,17 @@ class HoymilesCYDPanel extends LitElement {
       .setup-header { margin-bottom: 40px; border-left: 4px solid var(--kairo-gold); padding-left: 25px; }
       .setup-title { font-size: 1.8em; font-weight: 900; letter-spacing: 2px; }
       
+      .zen-master-switch { display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; margin-bottom: 30px; border-radius: 20px; transition: 0.4s; }
+      .zen-master-switch.active { border-color: var(--kairo-cyan); box-shadow: 0 0 30px rgba(0,242,255,0.1), inset 0 0 20px rgba(0,242,255,0.05); }
+      .zms-info { display: flex; align-items: center; gap: 20px; }
+      .zms-icon-wrap { width: 50px; height: 50px; border-radius: 14px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; transition: 0.4s; }
+      .zen-master-switch.active .zms-icon-wrap { background: rgba(0,242,255,0.1); }
+      .zms-icon { font-size: 1.8em; color: #8b949e; transition: 0.4s; }
+      .zen-master-switch.active .zms-icon { color: var(--kairo-cyan); filter: drop-shadow(0 0 10px var(--kairo-cyan)); }
+      .zms-title { font-size: 1.1em; font-weight: 900; letter-spacing: 2px; color: #fff; }
+      .zms-desc { font-size: 0.8em; color: #8b949e; margin-top: 4px; font-weight: 600; }
+      .zen-master-switch.active .zms-desc { color: var(--kairo-cyan); }
+
       .sub-nav { 
         display: flex; 
         gap: 10px; 
@@ -1305,9 +1415,24 @@ class HoymilesCYDPanel extends LitElement {
       .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; }
       .help-section { background: rgba(255,255,255,0.02); padding: 30px; border-radius: 24px; border: 1px solid var(--kairo-glass-border); }
       .help-section h4 { color: var(--kairo-gold); margin-top: 0; display: flex; align-items: center; gap: 10px; }
-      .help-section p { color: #8b949e; line-height: 1.6; }
+      .help-section p { color: #8b949e; line-height: 1.6; margin-bottom: 0; }
+
+      .donate-section { display: flex; align-items: center; justify-content: space-between; padding: 30px 40px; border-radius: 24px; margin-top: 40px; border: 1px solid var(--kairo-gold); background: rgba(247, 147, 26, 0.05); }
+      .donate-content { display: flex; align-items: center; gap: 20px; }
+      .donate-text h3 { margin: 0 0 5px 0; color: var(--kairo-gold); letter-spacing: 1px; font-weight: 900; }
+      .donate-text p { margin: 0; color: #8b949e; font-size: 0.9em; line-height: 1.5; max-width: 450px; }
+      .donate-actions { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+      .donate-btn { display: flex; align-items: center; gap: 10px; background: var(--kairo-gold); color: #000; padding: 15px 25px; border-radius: 16px; font-weight: 900; text-decoration: none; transition: 0.3s; letter-spacing: 1px; font-size: 0.9em; border: 2px solid var(--kairo-gold); }
+      .donate-btn.outline { background: transparent; color: var(--kairo-gold); }
+      .donate-btn.outline:hover { background: rgba(247, 147, 26, 0.1); transform: translateY(-3px); }
+      .donate-btn:not(.outline):hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(247, 147, 26, 0.3); }
 
       @media (max-width: 768px) {
+        .donate-section { flex-direction: column; gap: 20px; text-align: center; padding: 25px; }
+        .donate-content { flex-direction: column; text-align: center; }
+        .donate-text p { max-width: 100%; }
+        .donate-actions { width: 100%; flex-direction: column; gap: 10px; }
+        .donate-btn { width: 100%; justify-content: center; box-sizing: border-box; }
         .dashboard-layout { grid-template-columns: 1fr; padding: 0 15px; }
         .sidebar { flex-direction: row; flex-wrap: wrap; gap: 15px; }
         .side-card { flex: 1; min-width: 280px; padding: 20px; }

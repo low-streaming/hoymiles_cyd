@@ -114,8 +114,8 @@ class HoymilesCYDConfigView(HomeAssistantView):
                 "grid_sensor_l2": "",
                 "grid_sensor_l3": "",
                 "weather_sensor": "",
-                "weather_protection_enabled": false,
-                "night_reserve_enabled": false,
+                "weather_protection_enabled": False,
+                "night_reserve_enabled": False,
                 "night_reserve_soc": 25,
                 "night_reserve_start_time": "18:00"
             }
@@ -228,13 +228,14 @@ class HoymilesCYDSyncView(HomeAssistantView):
         if manager:
             ze_status = getattr(manager, "status", "Unbekannt")
 
-        # Get current version from manifest
+        # Get current version from manifest (async-safe)
         version = "unknown"
         try:
             manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
-            with open(manifest_path, "r") as f:
-                manifest_data = json.load(f)
-                version = manifest_data.get("version", "unknown")
+            def _read_manifest():
+                with open(manifest_path, "r") as f:
+                    return json.load(f).get("version", "unknown")
+            version = await request.app["hass"].async_add_executor_job(_read_manifest)
         except Exception:
             pass
 
