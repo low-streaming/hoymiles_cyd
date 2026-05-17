@@ -200,7 +200,7 @@ class HoymilesCYDPanel extends LitElement {
       generic_limit_type: 'watt',
       zero_export_hysteresis: 5,
       zero_export_interval: 10,
-      grid_sensor_type: 'net',
+      electricity_price: 30.0,
       sub_consumer_1_name: '', sub_consumer_1_sensor: '', sub_consumer_1_icon: 'mdi:power-plug', sub_consumer_1_toggle: '', sub_consumer_1_use_as_load: false,
       sub_consumer_2_name: '', sub_consumer_2_sensor: '', sub_consumer_2_icon: 'mdi:power-plug', sub_consumer_2_toggle: '', sub_consumer_2_use_as_load: false,
       sub_consumer_3_name: '', sub_consumer_3_sensor: '', sub_consumer_3_icon: 'mdi:power-plug', sub_consumer_3_toggle: '', sub_consumer_3_use_as_load: false,
@@ -639,8 +639,25 @@ class HoymilesCYDPanel extends LitElement {
             <div class="s-flex">
               <div class="s-icon"><ha-icon icon="mdi:finance"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Autarkie</span> <span class="green">${(yield_t + import_t - export_t) > 0.1 ? Math.max(0, Math.min(100, ((yield_t - export_t) / (yield_t + import_t - export_t) * 100))).toFixed(1) : '0.0'}%</span></div>
-                <div class="s-row"><span>Eigenverbrauch</span> <span class="green">${yield_t > 0.1 ? Math.max(0, Math.min(100, ((yield_t - export_t) / yield_t * 100))).toFixed(1) : '0.0'}%</span></div>
+                <div class="s-row">
+                  <span>Autarkie</span> 
+                  <span class="green">
+                    ${(() => {
+                      const consumed = Math.max(0, yield_t - export_t);
+                      const cons_tot = yield_t + import_t - export_t;
+                      return cons_tot > 0.1 ? Math.min(100, (consumed / cons_tot) * 100).toFixed(1) : '0.0';
+                    })()}%
+                  </span>
+                </div>
+                <div class="s-row">
+                  <span>Eigenverbrauch</span> 
+                  <span class="green">
+                    ${(() => {
+                      const consumed = Math.max(0, yield_t - export_t);
+                      return yield_t > 0.1 ? Math.min(100, (consumed / yield_t) * 100).toFixed(1) : '0.0';
+                    })()}%
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -649,8 +666,20 @@ class HoymilesCYDPanel extends LitElement {
             <div class="s-flex">
               <div class="s-icon" style="color: var(--kairo-gold);"><ha-icon icon="mdi:piggy-bank-outline"></ha-icon></div>
               <div class="s-vals">
-                <div class="s-row"><span>Gespart</span> <span style="color: var(--kairo-gold); font-weight: 800;">${(this._savedWh / 1000).toFixed(2)}kWh</span></div>
-                <div class="s-row"><span>Wert (30ct)</span> <span style="color: #fff;">${((this._savedWh / 1000) * 0.30).toFixed(2)} €</span></div>
+                ${(() => {
+                  const price_ct = this.config.electricity_price || 30.0;
+                  const price_euro = price_ct / 100.0;
+                  const saved_today = Math.max(0, yield_t - export_t);
+                  const saved_today_val = saved_today * price_euro;
+                  const saved_zen = this._savedWh / 1000.0;
+                  const saved_zen_val = saved_zen * price_euro;
+                  return html`
+                    <div class="s-row"><span>Heute (Eigen)</span> <span style="color: var(--kairo-gold); font-weight: 800;">${saved_today.toFixed(2)} kWh</span></div>
+                    <div class="s-row"><span>Wert Heute</span> <span style="color: #fff;">${saved_today_val.toFixed(2)} €</span></div>
+                    <div class="s-row" style="margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px; font-size: 0.85em;"><span>ZEN Gesamt</span> <span>${saved_zen.toFixed(1)} kWh</span></div>
+                    <div class="s-row" style="font-size: 0.85em;"><span>Wert Gesamt</span> <span>${saved_zen_val.toFixed(2)} €</span></div>
+                  `;
+                })()}
               </div>
             </div>
           </div>
@@ -843,12 +872,12 @@ class HoymilesCYDPanel extends LitElement {
     return html`
       <div class="settings-page animate-fade-in">
         <div class="setup-header">
-           <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+           <div class="setup-header-inner">
               <div>
                 <div class="setup-title">S_SETUP: KONFIGURATION</div>
                 <div class="setup-step">Schritt-für-Schritt Einrichtung für optimale Nulleinspeisung.</div>
               </div>
-              <div class="glass" style="padding: 10px 20px; border-radius: 12px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--kairo-glass-border); background: rgba(0,0,0,0.3);">
+              <div class="glass expert-badge">
                  <span style="font-size: 0.8em; font-weight: bold; color: var(--text-dim); letter-spacing: 1px;">EXPERTEN-MODUS</span>
                  <ha-switch .checked="${this._expertMode}" @change="${(e) => { this._expertMode = e.target.checked; this.requestUpdate(); }}"></ha-switch>
               </div>
@@ -888,6 +917,15 @@ class HoymilesCYDPanel extends LitElement {
                      <option value="opendtu">OpenDTU / AhoyDTU</option>
                      <option value="generic">Anderes (EZ1/HA)</option>
                   </select>
+               </div>
+
+               <div class="cfg-row">
+                  <div class="cfg-info">
+                     <div class="cfg-label">Strompreis (ct/kWh)</div>
+                     <div class="cfg-desc">Dein aktueller Strompreis zur Berechnung der Ersparnis.</div>
+                  </div>
+                  <input type="number" step="0.1" class="cfg-num" style="width:220px;" .value="${this.config.electricity_price || 30.0}"
+                    @change="${(e) => this.config.electricity_price = parseFloat(e.target.value) || 30.0}">
                </div>
 
                ${this.config.inverter_type !== 'hoymiles' ? html`
@@ -1100,7 +1138,11 @@ class HoymilesCYDPanel extends LitElement {
   renderHelp() {
     return html`
       <div class="settings-page animate-fade-in">
-        <div class="setup-header"><div class="setup-title">HILFE & SUPPORT</div></div>
+        <div class="setup-header">
+          <div class="setup-header-inner">
+             <div class="setup-title">HILFE & SUPPORT</div>
+          </div>
+        </div>
         <div class="help-grid">
            <div class="help-section">
              <h4><ha-icon icon="mdi:rocket-launch"></ha-icon> SCHNELLSTART</h4>
@@ -1317,6 +1359,8 @@ class HoymilesCYDPanel extends LitElement {
       @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
       .setup-header { margin-bottom: 40px; border-left: 4px solid var(--kairo-gold); padding-left: 25px; }
       .setup-title { font-size: 1.8em; font-weight: 900; letter-spacing: 2px; }
+      .setup-header-inner { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 15px; }
+      .expert-badge { padding: 10px 20px; border-radius: 12px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--kairo-glass-border); background: rgba(0,0,0,0.3); }
       
       .zen-master-switch { display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; margin-bottom: 30px; border-radius: 20px; transition: 0.4s; }
       .zen-master-switch.active { border-color: var(--kairo-cyan); box-shadow: 0 0 30px rgba(0,242,255,0.1), inset 0 0 20px rgba(0,242,255,0.05); }
@@ -1433,12 +1477,24 @@ class HoymilesCYDPanel extends LitElement {
         .donate-text p { max-width: 100%; }
         .donate-actions { width: 100%; flex-direction: column; gap: 10px; }
         .donate-btn { width: 100%; justify-content: center; box-sizing: border-box; }
+        .settings-page { padding: 0 15px; box-sizing: border-box; }
+        .config-grid { grid-template-columns: 1fr; gap: 15px; }
+        .config-section { grid-column: 1 / -1 !important; padding: 20px 15px; box-sizing: border-box; }
+        .canvas { height: 160px !important; }
         .dashboard-layout { grid-template-columns: 1fr; padding: 0 15px; }
         .sidebar { flex-direction: row; flex-wrap: wrap; gap: 15px; }
         .side-card { flex: 1; min-width: 280px; padding: 20px; }
         .header { padding: 20px 15px; gap: 15px; flex-direction: column; text-align: center; }
+        .global-zen-wrap { width: 100%; box-sizing: border-box; justify-content: space-between; }
         .main-nav { width: 95%; overflow-x: auto; justify-content: flex-start; padding: 8px 15px; }
         .nav-item { padding: 10px 20px; white-space: nowrap; font-size: 0.8em; }
+        .cfg-row { flex-direction: column; align-items: flex-start; gap: 10px; }
+        .cfg-num, select.cfg-num { width: 100% !important; box-sizing: border-box; }
+        .cfg-compact-row { grid-template-columns: 1fr; }
+        .setup-header-inner { flex-direction: column; align-items: flex-start; }
+        .expert-badge { width: 100%; justify-content: space-between; box-sizing: border-box; }
+        .sub-nav { flex-wrap: wrap; justify-content: center; width: 100%; box-sizing: border-box; }
+        .sub-item { flex: 1; text-align: center; min-width: 100px; padding: 10px; }
         .summary-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .inverter-hub { width: 100px; height: 100px; border-radius: 22px; border-width: 2px; }
         .hub-value { font-size: 1.6em; }
