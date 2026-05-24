@@ -428,6 +428,9 @@ class HoymilesCYDPanel extends LitElement {
       <div class="panel-container">
         <div class="cyber-grid"></div>
         <div class="header">
+          <div class="back-btn" @click="${() => window.history.length > 1 ? history.back() : (window.location.href = '/')}">
+            <ha-icon icon="mdi:arrow-left"></ha-icon>
+          </div>
           <div class="logo-area">
             <div class="logo-icon-kairo">
                <svg viewBox="0 0 100 100" class="k-logo">
@@ -1215,6 +1218,8 @@ class HoymilesCYDPanel extends LitElement {
       }
 
       .header { display: flex; justify-content: space-between; align-items: center; padding: 40px 60px; position: relative; z-index: 10; }
+      .back-btn { width: 44px; height: 44px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid var(--kairo-glass-border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; color: #8b949e; flex-shrink: 0; }
+      .back-btn:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: var(--kairo-cyan); box-shadow: 0 0 15px rgba(0,242,255,0.2); }
       .logo-area { display: flex; align-items: center; gap: 20px; }
       .logo-icon-kairo { width: 55px; height: 55px; filter: drop-shadow(0 0 10px var(--kairo-cyan)); }
       .logo-text h1 { margin: 0; font-size: 1.8em; letter-spacing: 6px; font-weight: 900; }
